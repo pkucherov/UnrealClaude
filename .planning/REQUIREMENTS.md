@@ -89,38 +89,38 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ABST-01 | TBD | Pending |
-| ABST-02 | TBD | Pending |
-| ABST-03 | TBD | Pending |
-| COMM-01 | TBD | Pending |
-| COMM-02 | TBD | Pending |
-| COMM-03 | TBD | Pending |
-| COMM-04 | TBD | Pending |
-| COMM-05 | TBD | Pending |
-| COMM-06 | TBD | Pending |
-| SRVR-01 | TBD | Pending |
-| SRVR-02 | TBD | Pending |
-| SRVR-03 | TBD | Pending |
-| SRVR-04 | TBD | Pending |
-| SRVR-05 | TBD | Pending |
-| MCPI-01 | TBD | Pending |
-| CHUI-01 | TBD | Pending |
-| CHUI-02 | TBD | Pending |
-| CHUI-03 | TBD | Pending |
-| CHUI-04 | TBD | Pending |
-| CHUI-05 | TBD | Pending |
-| CHUI-06 | TBD | Pending |
-| CHUI-07 | TBD | Pending |
-| TEST-00 | TBD | Pending |
-| TEST-01 | TBD | Pending |
-| TEST-02 | TBD | Pending |
-| TEST-03 | TBD | Pending |
-| TEST-04 | TBD | Pending |
+| TEST-00 | Phase 1: Test Baseline | Pending |
+| ABST-01 | Phase 2: Backend Abstraction | Pending |
+| ABST-02 | Phase 2: Backend Abstraction | Pending |
+| ABST-03 | Phase 2: Backend Abstraction | Pending |
+| COMM-02 | Phase 3: SSE Parser & Server Lifecycle | Pending |
+| COMM-03 | Phase 3: SSE Parser & Server Lifecycle | Pending |
+| SRVR-01 | Phase 3: SSE Parser & Server Lifecycle | Pending |
+| SRVR-02 | Phase 3: SSE Parser & Server Lifecycle | Pending |
+| SRVR-03 | Phase 3: SSE Parser & Server Lifecycle | Pending |
+| SRVR-04 | Phase 3: SSE Parser & Server Lifecycle | Pending |
+| SRVR-05 | Phase 3: SSE Parser & Server Lifecycle | Pending |
+| TEST-02 | Phase 3: SSE Parser & Server Lifecycle | Pending |
+| TEST-03 | Phase 3: SSE Parser & Server Lifecycle | Pending |
+| COMM-01 | Phase 4: OpenCode Runner & Sessions | Pending |
+| COMM-04 | Phase 4: OpenCode Runner & Sessions | Pending |
+| COMM-05 | Phase 4: OpenCode Runner & Sessions | Pending |
+| COMM-06 | Phase 4: OpenCode Runner & Sessions | Pending |
+| MCPI-01 | Phase 4: OpenCode Runner & Sessions | Pending |
+| TEST-01 | Phase 4: OpenCode Runner & Sessions | Pending |
+| CHUI-01 | Phase 5: Chat UI & Backend Switching | Pending |
+| CHUI-02 | Phase 5: Chat UI & Backend Switching | Pending |
+| CHUI-03 | Phase 5: Chat UI & Backend Switching | Pending |
+| CHUI-04 | Phase 5: Chat UI & Backend Switching | Pending |
+| CHUI-05 | Phase 5: Chat UI & Backend Switching | Pending |
+| CHUI-06 | Phase 5: Chat UI & Backend Switching | Pending |
+| CHUI-07 | Phase 5: Chat UI & Backend Switching | Pending |
+| TEST-04 | Phase 5: Chat UI & Backend Switching | Pending |
 
 **Coverage:**
-- v1 requirements: 25 total
-- Mapped to phases: 0
-- Unmapped: 25 ⚠️
+- v1 requirements: 27 total
+- Mapped to phases: 27 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-30*
