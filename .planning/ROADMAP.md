@@ -28,7 +28,14 @@ Decimal phases appear between their surrounding integers in numeric order.
   1. All existing automation tests pass when run via `Automation RunTests UnrealClaude`
   2. Test coverage for pre-existing components (subsystem, runner, session manager, MCP tools) is documented with current counts
   3. Coverage gaps in core components (IClaudeRunner consumers, ClaudeSubsystem, session manager) are filled with new tests targeting ≥90% where feasible
-**Plans**: TBD
+**Plans:** 5 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Test infrastructure (TestUtils.h) + ClaudeSubsystem + ClaudeRunner tests
+- [ ] 01-02-PLAN.md — SessionManager + MCPServer + Constants tests
+- [ ] 01-03-PLAN.md — ProjectContext + ScriptExecution + Module startup tests
+- [ ] 01-04-PLAN.md — Slate widget tests + MCPTaskQueue latent test fix attempt
+- [ ] 01-05-PLAN.md — Comprehensive coverage report + MCP bridge JS test documentation
 
 ### Phase 2: Backend Abstraction
 **Goal**: The plugin's chat interface is fully backend-agnostic — any backend can be plugged in without touching the subsystem or UI
@@ -86,7 +93,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Test Baseline | 0/TBD | Not started | - |
+| 1. Test Baseline | 0/5 | Planned | - |
 | 2. Backend Abstraction | 0/TBD | Not started | - |
 | 3. SSE Parser & Server Lifecycle | 0/TBD | Not started | - |
 | 4. OpenCode Runner & Sessions | 0/TBD | Not started | - |
