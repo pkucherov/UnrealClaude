@@ -2,10 +2,6 @@
 
 This file provides guidance to Claude Code when working with the UnrealClaude plugin and Unreal Engine 5.7 projects.
 
-## Setup
-
-Copy this file to `CLAUDE.md` in the same directory and customize the build paths for your system.
-
 ## Project Overview
 
 **UnrealClaude** is an Unreal Engine 5.7 plugin that provides MCP (Model Context Protocol) integration, enabling Claude AI to interact directly with the Unreal Editor via REST API tools.
@@ -48,6 +44,8 @@ When performing complex Unreal tasks, use parallel MCP tool calls and subagents 
 - Unreal's task queue processes **max 4 concurrent tasks**. Extra calls queue automatically but add latency.
 - Keep parallel subagent count to **3 subagents max** (leaves 1 slot for the lead agent's own calls).
 - Timeout chain: Game thread dispatch = 30s → Task default = 2 min → Bridge async = 5 min.
+- Read-only tools are fast (~50-200ms). Modifying tools (blueprint, spawn) may take 1-5s each.
+- If a subagent needs 5+ sequential tool calls, budget ~30s and keep tasks focused.
 
 **Tool parallelization classes:**
 
@@ -59,8 +57,23 @@ When performing complex Unreal tasks, use parallel MCP tool calls and subagents 
 
 **When to use subagents (Task tool):**
 - Request maps to 3+ independent operations on different objects
+- Examples: "set up a level" → lighting agent + mesh agent + gameplay agent (3 subagents)
 - Lead agent surveys first (read-only), plans names, spawns subagents, verifies results
 - NEVER spawn more than 3 subagents — the task queue limit is 4 concurrent tasks total
+
+**When NOT to parallelize:**
+- Single-object operations — just call tools directly
+- Operations needing results from prior calls (spawn then move same actor)
+- Anything involving open_level, delete_actors, or execute_script
+- When the total parallel tool call count would exceed 4 (queue delays + timeout risk)
+
+**Subagent coordination:**
+1. Lead surveys state (get_level_actors, asset_search — parallel read-only calls)
+2. Lead plans decomposition with unique actor/asset names
+3. Lead spawns ≤3 subagents with explicit tool calls, names, and positions
+4. Lead verifies results (get_level_actors, capture_viewport)
+
+For detailed workflow patterns: `unreal_get_ue_context` with query "parallel workflows"
 
 ### Key Directories
 - `Source/UnrealClaude/Private/MCP/` - MCP server and tool implementations
@@ -70,25 +83,60 @@ When performing complex Unreal tasks, use parallel MCP tool calls and subagents 
 
 ### Build Commands
 ```bash
-# Build plugin - customize these paths for your system:
-# - UE_PATH: Your Unreal Engine installation
-# - PLUGIN_PATH: Path to UnrealClaude.uplugin
-# - OUTPUT_PATH: Temporary build output directory
-
-"<UE_PATH>/Engine/Build/BatchFiles/RunUAT.bat" BuildPlugin -Plugin="<PLUGIN_PATH>/UnrealClaude.uplugin" -Package="<OUTPUT_PATH>" -TargetPlatforms=Win64 -Rocket
+# Build plugin (from project root UnrealClaude/)
+"C:/Program Files/Epic Games/UE_5.7/Engine/Build/BatchFiles/RunUAT.bat" BuildPlugin -Plugin="C:/Users/Natal/OneDrive/Documents/Github/UnrealClaude/UnrealClaude/UnrealClaude.uplugin" -Package="C:/Users/Natal/OneDrive/Documents/Github/UnrealClaude/PluginBuild" -TargetPlatforms=Win64 -Rocket
 
 # Run tests (in Unreal Editor console)
 Automation RunTests UnrealClaude
 ```
+
+### Build Directories
+- **Temporary Build Output**: `C:/Users/Natal/OneDrive/Documents/Github/UnrealClaude/PluginBuild/` - UAT builds here
+- **Engine Installation**: `C:/Program Files/Epic Games/UE_5.7/Engine/Plugins/Marketplace/UnrealClaude/` - Copy binaries here after build
+
+**NOTE**: Binaries are no longer tracked in the repository (LFS removed). After building, copy from `PluginBuild/Binaries/Win64/` to the engine Marketplace folder for local use.
+
+### MCP Bridge (Git Submodule)
+
+`Resources/mcp-bridge/` is a **git submodule** pointing to [`Natfii/ue5-mcp-bridge`](https://github.com/Natfii/ue5-mcp-bridge).
+
+**Fresh clone setup:**
+```bash
+git clone --recurse-submodules https://github.com/Natfii/UnrealClaude.git
+# Or if already cloned:
+git submodule update --init
+cd Resources/mcp-bridge && npm install
+```
+
+**Workflow for MCP bridge changes:**
+1. `cd Resources/mcp-bridge` — enter the submodule
+2. Make changes, commit, and push within the submodule (`git add . && git commit && git push`)
+3. `cd ../..` — return to parent repo
+4. `git add Resources/mcp-bridge` — stage the updated submodule ref
+5. Commit the parent repo to record the new submodule commit
+
+**Run tests:** `cd Resources/mcp-bridge && npm test`
+
+**When to update tests:**
+- Adding or modifying MCP tools
+- Changing `context-loader.js`
+- Fixing bridge bugs (add regression test first)
+- Changing HTTP request/response format
+
+**Test structure:**
+- `tests/unit/` — Schema conversion, HTTP client, context loader, async execution
+- `tests/integration/` — Tool listing, tool execution with mocked Unreal server
+- `tests/helpers/` — Mock fetch, fixtures
 
 ---
 
 ## Unreal Engine 5.7 C++ Standards
 
 ### IMPORTANT: Stay Focused on UE 5.7
-- This project targets **Unreal Engine 5.7** exclusively
+- This project targets **Unreal Engine 5.7.2** exclusively
 - Use UE 5.7 API patterns and conventions
 - Do NOT suggest deprecated APIs or patterns from older engine versions
+- When uncertain about API availability, verify against UE 5.7 documentation
 
 ### File Organization
 - **Maximum 500 lines per file** - Split large files into logical units
@@ -96,30 +144,12 @@ Automation RunTests UnrealClaude
 - **Private/** folder for implementation files
 - **Public/** folder for headers meant for external use
 
-### UPROPERTY Specifiers (UE 5.7)
-```cpp
-// Editor-visible and Blueprint-accessible
-UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Category")
-int32 EditableProperty;
+### UE 5.7 C++ Reference
 
-// Asset references (UE 5.x preferred)
-UPROPERTY(EditAnywhere)
-TObjectPtr<UTexture2D> Texture;  // Hard reference
-
-UPROPERTY(EditAnywhere)
-TSoftObjectPtr<UStaticMesh> MeshAsset;  // Soft reference
-```
-
-### UFUNCTION Specifiers (UE 5.7)
-```cpp
-// Blueprint callable (has execution pins)
-UFUNCTION(BlueprintCallable, Category = "MyCategory")
-void DoSomething();
-
-// Blueprint pure (no execution pins, no side effects)
-UFUNCTION(BlueprintPure, Category = "MyCategory")
-int32 GetValue() const;
-```
+For UPROPERTY/UFUNCTION specifiers, animation API, Slate patterns, and common UE patterns:
+- Use `unreal_get_ue_context` with relevant category (animation, blueprint, slate, etc.)
+- Use the engine source at `C:/Users/Natal/Github/UnrealEngine/Engine/Source/` for API verification
+- Copyright header: `// Copyright Natali Caggiano. All Rights Reserved.`
 
 ---
 
@@ -145,7 +175,17 @@ FMCPToolResult FMCPTool_YourTool::Execute(const TSharedRef<FJsonObject>& Params)
         return Error.GetValue();
     }
 
+    // Validate paths for security
+    if (!ValidateBlueprintPathParam(BlueprintPath, Error))
+    {
+        return Error.GetValue();
+    }
+
+    // Extract optional parameters with defaults
+    int32 OptionalInt = Params->GetIntegerField(TEXT("optional_param"));
+
     // Do work...
+
     return FMCPToolResult::Success(TEXT("Operation completed"));
 }
 ```
@@ -166,7 +206,7 @@ Info.Annotations = FMCPToolAnnotations::Destructive();
 
 ## Dynamic UE 5.7 Context System
 
-The MCP bridge includes dynamic context files that provide accurate UE 5.7 API documentation.
+The MCP bridge includes dynamic context files that provide accurate UE 5.7 API documentation. These are loaded on-demand based on tool usage or explicit queries.
 
 ### Context Files Location
 ```
@@ -180,8 +220,7 @@ Resources/mcp-bridge/contexts/
 ├── material.md             # Material instances, parameters, assignment
 ├── parallel_workflows.md   # Parallel tool execution, subagent patterns
 ├── replication.md          # Network replication, RPCs, DOREPLIFETIME
-├── slate.md                # Slate UI widgets, SNew/SAssignNew patterns
-└── ue-core-api.md          # Core UE 5.7 API reference (class hierarchy, specifiers)
+└── slate.md                # Slate UI widgets, SNew/SAssignNew patterns
 ```
 
 ### Maintaining Context Files
@@ -191,52 +230,84 @@ Resources/mcp-bridge/contexts/
 1. **Update relevant context file** in `Resources/mcp-bridge/contexts/`
 2. **Verify accuracy** via web search or official UE 5.7 documentation
 3. **Add tool patterns** to `context-loader.js` if new tool categories are added
+4. **Test context loading**:
+   ```bash
+   cd Resources/mcp-bridge
+   node -e "import('./context-loader.js').then(m => console.log(m.listCategories()))"
+   ```
 
 ### Adding New Context Categories
 
 1. Create `Resources/mcp-bridge/contexts/newcategory.md`
-2. Add entry to `CONTEXT_CONFIG` in `context-loader.js`
-3. Update CLAUDE.md and README.md
+2. Add entry to `CONTEXT_CONFIG` in `context-loader.js`:
+   ```javascript
+   newcategory: {
+     files: ["newcategory.md"],
+     toolPatterns: [/pattern1/, /pattern2/],
+     keywords: ["keyword1", "keyword2", ...]
+   }
+   ```
+3. Update this CLAUDE.md and README.md
 
 ### Context Accuracy Guidelines
 
 - All code examples must be verified against UE 5.7 API
 - Use web search to confirm API signatures before documenting
+- Include source links in context files where helpful
 - Remove deprecated patterns from older engine versions
 
-### UE 5.7 Engine Source Reference (Optional)
+### MCP Tutorials & Guidelines
 
-If you have access to the EpicGames GitHub organization, you can clone the engine source locally for Claude Code to use as an authoritative API reference. This is far more accurate than web search for verifying function signatures, includes, and specifiers.
+Tutorial and guideline documents for MCP development are maintained at:
 
-**Setup** (sparse + shallow clone, ~2-5 GB instead of 30+ GB):
-```bash
-mkdir -p "<YOUR_PATH>"
-cd "<YOUR_PATH>"
-git clone --depth 1 --branch 5.7.3-release --filter=blob:none --sparse \
-  https://github.com/EpicGames/UnrealEngine.git
-cd UnrealEngine
-git sparse-checkout set Engine/Source
-```
+- **Local Path**: `C:/Users/Natal/OneDrive/Documents/Github/UnrealClaude/Tutorials/`
 
-**Fill in your path below** (uncomment and update):
-<!-- UE_SOURCE_PATH: <YOUR_PATH>/UnrealEngine/Engine/Source/ -->
+Consult these when doing MCP tool development, bridge modifications, or integration work.
+
+### UE 5.7 Engine Source Reference
+
+A local sparse checkout of the Unreal Engine 5.7.3 source is available for verifying API signatures, finding includes, and checking implementations:
+
+- **Path**: `C:/Users/Natal/Github/UnrealEngine/Engine/Source/`
+- **Tag**: `5.7.3-release` (shallow clone, `Engine/Source/` only)
 
 **When to use the engine source:**
 - Verifying UPROPERTY/UFUNCTION specifiers and their exact syntax
 - Finding the correct `#include` path for a class or struct
 - Checking function signatures, parameter types, and return values
 - Understanding base class implementations before overriding
+- Confirming API availability in 5.7 (vs deprecated/removed APIs)
+
+**When NOT to use the engine source:**
+- Don't read entire large files — use Grep to find specific symbols
+- Don't browse aimlessly — search for the specific class/function you need
+- Prefer MCP tools for runtime editor state (actors, assets, levels)
 
 **Key subdirectories:**
 
 | Directory | Contents |
 |-----------|----------|
 | `Runtime/Engine/Classes/` | Core classes: AActor, UWorld, UGameInstance, components |
+| `Runtime/Engine/Public/` | Engine public headers |
 | `Runtime/CoreUObject/` | UObject, UPROPERTY, reflection, garbage collection |
 | `Editor/UnrealEd/` | Editor subsystems, FBlueprintEditorUtils, asset tools |
 | `Runtime/AnimGraphRuntime/` | Animation blueprint nodes, state machine runtime |
-| `Runtime/EnhancedInput/` | Enhanced Input System |
+| `Runtime/EnhancedInput/` | Enhanced Input System (UInputAction, UInputMappingContext) |
 | `Runtime/SlateCore/` + `Runtime/Slate/` | Slate UI framework |
+| `Runtime/UMG/` | UMG/Widget framework |
+| `Developer/AssetTools/` | Asset type actions, import/export |
+
+**Search examples:**
+```bash
+# Find a class header
+Grep for "class.*AActor\b" in Engine/Source/ with glob "*.h"
+
+# Find UFUNCTION signature
+Grep for "GetActorLocation" in Engine/Source/Runtime/Engine/
+
+# Find include path for a type
+Grep for "FStreamableManager" in Engine/Source/ with glob "*.h"
+```
 
 ---
 
@@ -252,13 +323,18 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FMyTest::RunTest(const FString& Parameters)
 {
+    // Test assertions
     TestTrue("Description of what should be true", bCondition);
+    TestFalse("Description of what should be false", bCondition);
     TestEqual("Values should match", ActualValue, ExpectedValue);
+    TestNotNull("Pointer should not be null", Pointer);
+    TestNull("Pointer should be null", Pointer);
+
     return true;
 }
 ```
 
-### Test Categories
+### Test Categories for This Project
 - `UnrealClaude.MCP.Tools.*` - Individual tool tests
 - `UnrealClaude.MCP.ParamValidator.*` - Parameter validation tests
 - `UnrealClaude.MCP.Registry.*` - Tool registry tests
@@ -272,6 +348,14 @@ bool FMyTest::RunTest(const FString& Parameters)
 2. **Actor Name Validation**: Block special characters `<>|&;$(){}[]!*?~`
 3. **Console Command Validation**: Block dangerous commands (quit, crash, shutdown)
 4. **Numeric Validation**: Check for NaN, Infinity, reasonable bounds
+
+### Never Do
+- Execute arbitrary code without permission dialogs
+- Allow access to engine internals
+- Skip parameter validation
+- Trust user input without sanitization
+
+---
 
 ---
 

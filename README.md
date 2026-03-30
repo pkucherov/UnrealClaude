@@ -2,14 +2,14 @@
 
 ![Unreal Engine](https://img.shields.io/badge/Unreal%20Engine-5.7-313131?style=flat&logo=unrealengine&logoColor=white)
 ![C++](https://img.shields.io/badge/C%2B%2B-20-00599C?style=flat&logo=c%2B%2B&logoColor=white)
-![Platform](https://img.shields.io/badge/Platform-Win64%20%7C%20Linux-0078D6?style=flat&logo=windows&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Win64%20%7C%20Linux%20%7C%20Mac-0078D6?style=flat&logo=windows&logoColor=white)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-Integration-D97757?style=flat&logo=anthropic&logoColor=white)
 ![MCP](https://img.shields.io/badge/MCP-20%2B%20Tools-8A2BE2?style=flat)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat)
 
 **Claude Code CLI integration for Unreal Engine 5.7** - Get AI coding assistance with built-in UE5.7 documentation context directly in the editor.
 
-> **Supported Platforms:** Windows (Win64) and Linux. Mac support is not yet available.
+> **Supported Platforms:** Windows (Win64), Linux, and macOS (Apple Silicon). On Windows please use Claude Code 2.1.52 or older if you run into tool issues (2.1.71 seems ok from testing so far).
 
 ## Overview
 
@@ -57,40 +57,60 @@ claude -p "Hello, can you see me?"
 
 <img width="1222" height="99" alt="Screenshot 2026-02-06 112433" src="https://github.com/user-attachments/assets/61d72364-f7bc-4f34-a768-aedc0f5cea2e" />
 
-(Check the Editor catagory in the plugin browser. You might need to scroll down for it if search doesn't pick it up)
+(Check the Editor category in the plugin browser. You might need to scroll down for it if search doesn't pick it up)
 
-### Option A: Copy to Project Plugins (Recommended)
+### Step 1: Clone and Build
 
-Prebuilt binaries for **UE 5.7 Win64** are included - no compilation required. Linux users will need to build from source (see below).
+This plugin must be built from source for your platform and engine version. No prebuilt binaries are included.
 
-> **Important:** This repo uses [Git LFS](https://git-lfs.com/) for binary files (`.dll`, `.pdb`). You must have Git LFS installed before cloning, or the binaries will be downloaded as small placeholder files and the plugin will fail to load.
-> ```bash
-> git lfs install   # one-time setup
-> ```
-
-1. Clone this repository (do not use "Download ZIP" — it won't include the binaries)
-2. Copy the `UnrealClaude` folder to your project's `Plugins` directory:
-   ```
-   YourProject/
-   ├── Content/
-   ├── Source/
-   └── Plugins/
-       └── UnrealClaude/
-           ├── Binaries/
-           │   └── Win64/         # Prebuilt binaries (Windows)
-           ├── Source/
-           ├── Resources/
-           ├── Config/
-           └── UnrealClaude.uplugin
-   ```
-3. **Install MCP Bridge dependencies** (required for Blueprint tools and editor integration):
+1. Clone this repository (includes the MCP bridge submodule):
    ```bash
-   cd YourProject/Plugins/UnrealClaude/Resources/mcp-bridge
-   npm install
+   git clone --recurse-submodules https://github.com/Natfii/UnrealClaude.git
    ```
-4. Launch the editor - the plugin will load automatically
+   If you already cloned without `--recurse-submodules`, run:
+   ```bash
+   cd UnrealClaude
+   git submodule update --init
+   ```
 
-### Option B: Engine Plugin (All Projects)
+2. Build the plugin:
+
+   **Windows:**
+   ```bash
+   Engine\Build\BatchFiles\RunUAT.bat BuildPlugin -Plugin="PATH\TO\UnrealClaude\UnrealClaude\UnrealClaude.uplugin" -Package="OUTPUT\PATH" -TargetPlatforms=Win64
+   ```
+
+   **Linux:**
+   ```bash
+   Engine/Build/BatchFiles/RunUAT.sh BuildPlugin -Plugin="/path/to/UnrealClaude/UnrealClaude/UnrealClaude.uplugin" -Package="/output/path" -TargetPlatforms=Linux
+   ```
+
+   **macOS:**
+   ```bash
+   Engine/Build/BatchFiles/RunUAT.sh BuildPlugin -Plugin="/path/to/UnrealClaude/UnrealClaude/UnrealClaude.uplugin" -Package="/output/path" -TargetPlatforms=Mac
+   ```
+
+### Step 2: Install the Plugin
+
+Copy the built plugin to either your **project** or **engine** plugins folder.
+
+**Option A: Project Plugin (Recommended)**
+
+Copy the build output to your project's `Plugins` directory:
+```
+YourProject/
+├── Content/
+├── Source/
+└── Plugins/
+    └── UnrealClaude/
+        ├── Binaries/
+        ├── Source/
+        ├── Resources/
+        ├── Config/
+        └── UnrealClaude.uplugin
+```
+
+**Option B: Engine Plugin (All Projects)**
 
 Copy to your engine's plugins folder:
 
@@ -104,25 +124,35 @@ C:\Program Files\Epic Games\UE_5.7\Engine\Plugins\Marketplace\UnrealClaude\
 /path/to/UnrealEngine/Engine/Plugins/Marketplace/UnrealClaude/
 ```
 
-Then install the MCP bridge dependencies:
+### Step 3: Install MCP Bridge Dependencies
+
+Required for Blueprint tools and editor integration:
 ```bash
-cd <EnginePluginsPath>/UnrealClaude/Resources/mcp-bridge
+cd <PluginPath>/UnrealClaude/Resources/mcp-bridge
 npm install
 ```
 
-### Building from Source
+### Step 4: Launch
 
-If you need to rebuild (different UE version, modifications, etc.):
+Launch the editor - the plugin will load automatically.
 
-**Windows:**
-```bash
-Engine\Build\BatchFiles\RunUAT.bat BuildPlugin -Plugin="PATH\TO\UnrealClaude.uplugin" -Package="OUTPUT\PATH" -TargetPlatforms=Win64
-```
+## macOS Quick Start (Apple Silicon)
 
-**Linux:**
-```bash
-Engine/Build/BatchFiles/RunUAT.sh BuildPlugin -Plugin="/path/to/UnrealClaude.uplugin" -Package="/output/path" -TargetPlatforms=Linux
-```
+For full details, see [INSTALL_MAC.md](INSTALL_MAC.md).
+
+1. **Install Node.js and Claude Code CLI:**
+   ```bash
+   brew install node
+   npm install -g @anthropic-ai/claude-code
+   claude
+   ```
+2. **Install the plugin** into your project's `Plugins/` directory
+3. **Install MCP bridge dependencies:**
+   ```bash
+   cd YourProject/Plugins/UnrealClaude/Resources/mcp-bridge
+   npm install
+   ```
+4. **Launch** the editor and open **Tools > Claude Assistant**
 
 ## Linux Quick Start (Rocky/Fedora)
 
@@ -193,6 +223,10 @@ UnrealClaude automatically gathers information about your project:
 - Recent assets
 - Custom CLAUDE.md instructions
 
+### Scripting
+
+<img width="707" height="542" alt="{AB6AC101-4A4C-4607-BFB6-187D49F5E65B}" src="https://github.com/user-attachments/assets/e0c2e398-8fcd-4ac6-ade7-d50870215ec1" />
+
 ### MCP Server
 
 The plugin includes a Model Context Protocol (MCP) server with 20+ tools that expose editor functionality to Claude and external tools. The MCP server runs on port 3000 by default and starts automatically when the editor loads.
@@ -208,8 +242,6 @@ The plugin includes a Model Context Protocol (MCP) server with 20+ tools that ex
 - **Enhanced Input Tools** - Input action and mapping context management
 - **Utility Tools** - Console commands, output log, viewport capture, script execution
 - **Async Task Queue** - Background execution for long-running operations
-
-<img width="707" height="542" alt="{AB6AC101-4A4C-4607-BFB6-187D49F5E65B}" src="https://github.com/user-attachments/assets/e0c2e398-8fcd-4ac6-ade7-d50870215ec1" />
 
 For full MCP tool documentation with parameters, examples, and API details, see [UnrealClaude's MCP Bridge](https://github.com/Natfii/ue5-mcp-bridge) repository.
 
@@ -280,9 +312,12 @@ Run `claude auth login` in a terminal to authenticate.
 
 Claude Code executes in your project directory and may read files for context. Large projects may have slower initial responses.
 
+You might also have too many global Claude Code plugins enabled (i.e. Superpowers, ralp-loop, context7). The context for those plugins 
+getting injected can cause slowdowns up to 3+ minutes. 
+
 ### Plugin doesn't compile
 
-Ensure you're on Unreal Engine 5.7. Supported platforms are Windows (Win64) and Linux.
+Ensure you're on Unreal Engine 5.7. Supported platforms are Windows (Win64), Linux, and macOS.
 
 ### MCP Server not starting
 
@@ -328,7 +363,7 @@ This tests the bridge without requiring a running Unreal Editor.
 Feel free to fork for your own needs! Possible areas for improvement:
 
 - [x] Linux support (thanks [@bearyjd](https://github.com/bearyjd))
-- [ ] Mac support
+- [x] Mac support (thanks [@lateralsummer](https://github.com/lateralsummer))
 - [ ] Additional MCP tools (current tools need refractoring, no new ones for now)
 
 ## License

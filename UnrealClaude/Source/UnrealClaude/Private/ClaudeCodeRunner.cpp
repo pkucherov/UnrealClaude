@@ -362,7 +362,10 @@ FString FClaudeCodeRunner::BuildCommandLine(const FClaudeRequestConfig& Config)
 
 			if (FFileHelper::SaveStringToFile(MCPConfigContent, *MCPConfigPath))
 			{
-				FString EscapedConfigPath = MCPConfigPath.Replace(TEXT("\\"), TEXT("/"));
+				// Convert to absolute path - FPaths::ProjectSavedDir() returns a relative path on macOS
+				// which UE resolves internally, but external processes (Claude CLI) need the full path
+				FString AbsConfigPath = FPaths::ConvertRelativePathToFull(MCPConfigPath);
+				FString EscapedConfigPath = AbsConfigPath.Replace(TEXT("\\"), TEXT("/"));
 				CommandLine += FString::Printf(TEXT("--mcp-config \"%s\" "), *EscapedConfigPath);
 				UE_LOG(LogUnrealClaude, Log, TEXT("MCP config written to: %s"), *MCPConfigPath);
 			}
@@ -826,7 +829,37 @@ void FClaudeCodeRunner::ParseAndEmitNdjsonLine(const FString& JsonLine)
 			{
 				FString ToolUseId, ResultContent;
 				(*ContentObj)->TryGetStringField(TEXT("tool_use_id"), ToolUseId);
-				(*ContentObj)->TryGetStringField(TEXT("content"), ResultContent);
+
+				// content can be a string OR an array of content blocks
+				if (!(*ContentObj)->TryGetStringField(TEXT("content"), ResultContent))
+				{
+					// Extract text from content block array: [{"type":"text","text":"..."},...]
+					const TArray<TSharedPtr<FJsonValue>>* ResultArray;
+					if ((*ContentObj)->TryGetArrayField(TEXT("content"), ResultArray))
+					{
+						for (const TSharedPtr<FJsonValue>& Block : *ResultArray)
+						{
+							const TSharedPtr<FJsonObject>* BlockObj;
+							if (Block->TryGetObject(BlockObj))
+							{
+								FString BlockType;
+								(*BlockObj)->TryGetStringField(TEXT("type"), BlockType);
+								if (BlockType == TEXT("text"))
+								{
+									FString BlockText;
+									if ((*BlockObj)->TryGetStringField(TEXT("text"), BlockText))
+									{
+										if (!ResultContent.IsEmpty())
+										{
+											ResultContent += TEXT("\n");
+										}
+										ResultContent += BlockText;
+									}
+								}
+							}
+						}
+					}
+				}
 
 				UE_LOG(LogUnrealClaude, Log, TEXT("NDJSON ToolResult: tool_use_id=%s, content=%d chars"),
 					*ToolUseId, ResultContent.Len());
@@ -1101,11 +1134,12 @@ void FClaudeCodeRunner::ExecuteProcess()
 
 	UE_LOG(LogUnrealClaude, Log, TEXT("Async executing Claude: %s %s"), *ClaudePath, *CommandLine);
 
-	// Set working directory
+	// Set working directory - convert to absolute path since FPaths::ProjectDir()
+	// returns a relative path on macOS that external processes can't resolve
 	FString WorkingDir = CurrentConfig.WorkingDirectory;
 	if (WorkingDir.IsEmpty())
 	{
-		WorkingDir = FPaths::ProjectDir();
+		WorkingDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir());
 	}
 
 	// Create pipes for stdout capture

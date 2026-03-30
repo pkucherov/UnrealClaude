@@ -2,10 +2,12 @@
 
 #include "MCPTool_BlueprintQuery.h"
 #include "BlueprintUtils.h"
+#include "BlueprintGraphEditor.h"
 #include "MCP/MCPParamValidator.h"
 #include "UnrealClaudeModule.h"
-#include "AssetRegistry/AssetRegistryModule.h"
 #include "Engine/Blueprint.h"
+#include "K2Node_Variable.h"
+#include "K2Node_CallFunction.h"
 
 FMCPToolResult FMCPTool_BlueprintQuery::Execute(const TSharedRef<FJsonObject>& Params)
 {
@@ -31,219 +33,406 @@ FMCPToolResult FMCPTool_BlueprintQuery::Execute(const TSharedRef<FJsonObject>& P
 	{
 		return ExecuteGetGraph(Params);
 	}
+	else if (Operation == TEXT("get_nodes"))
+	{
+		return ExecuteGetNodes(Params);
+	}
+	else if (Operation == TEXT("get_variables"))
+	{
+		return ExecuteGetVariables(Params);
+	}
+	else if (Operation == TEXT("get_functions"))
+	{
+		return ExecuteGetFunctions(Params);
+	}
+	else if (Operation == TEXT("get_node_pins"))
+	{
+		return ExecuteGetNodePins(Params);
+	}
+	else if (Operation == TEXT("search_nodes"))
+	{
+		return ExecuteSearchNodes(Params);
+	}
+	else if (Operation == TEXT("find_references"))
+	{
+		return ExecuteFindReferences(Params);
+	}
 
 	return FMCPToolResult::Error(FString::Printf(
-		TEXT("Unknown operation: '%s'. Valid operations: 'list', 'inspect', 'get_graph'"), *Operation));
+		TEXT("Unknown operation: '%s'. Valid operations: 'list', 'inspect', 'get_graph', 'get_nodes', 'get_variables', 'get_functions', 'get_node_pins', 'search_nodes', 'find_references'"), *Operation));
 }
 
-FMCPToolResult FMCPTool_BlueprintQuery::ExecuteList(const TSharedRef<FJsonObject>& Params)
+// --- Shared helpers ---
+
+UBlueprint* FMCPTool_BlueprintQuery::LoadAndValidateBlueprint(const TSharedRef<FJsonObject>& Params)
 {
-	// Extract filters
-	FString PathFilter = ExtractOptionalString(Params, TEXT("path_filter"), TEXT("/Game/"));
-	FString TypeFilter = ExtractOptionalString(Params, TEXT("type_filter"));
-	FString NameFilter = ExtractOptionalString(Params, TEXT("name_filter"));
-	int32 Limit = ExtractOptionalNumber<int32>(Params, TEXT("limit"), 25);
-
-	// Clamp limit
-	Limit = FMath::Clamp(Limit, 1, 1000);
-
-	// Validate path filter
-	FString ValidationError;
-	if (!PathFilter.IsEmpty() && !FMCPParamValidator::ValidateBlueprintPath(PathFilter, ValidationError))
-	{
-		return FMCPToolResult::Error(ValidationError);
-	}
-
-	// Query AssetRegistry
-	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
-	IAssetRegistry& AssetRegistry = AssetRegistryModule.Get();
-
-	// Build filter
-	FARFilter Filter;
-	Filter.ClassPaths.Add(UBlueprint::StaticClass()->GetClassPathName());
-	Filter.bRecursivePaths = true;
-	Filter.bRecursiveClasses = true;
-
-	if (!PathFilter.IsEmpty())
-	{
-		Filter.PackagePaths.Add(FName(*PathFilter));
-	}
-
-	// Get assets
-	TArray<FAssetData> AssetDataList;
-	AssetRegistry.GetAssets(Filter, AssetDataList);
-
-	// Process results
-	TArray<TSharedPtr<FJsonValue>> ResultsArray;
-	int32 Count = 0;
-	int32 TotalMatching = 0;
-
-	for (const FAssetData& AssetData : AssetDataList)
-	{
-		// Get parent class name for filtering
-		FString ParentClassName;
-		FAssetDataTagMapSharedView::FFindTagResult ParentClassTag = AssetData.TagsAndValues.FindTag(FName("ParentClass"));
-		if (ParentClassTag.IsSet())
-		{
-			ParentClassName = ParentClassTag.GetValue();
-		}
-
-		// Apply type filter
-		if (!TypeFilter.IsEmpty())
-		{
-			if (!ParentClassName.Contains(TypeFilter, ESearchCase::IgnoreCase))
-			{
-				continue;
-			}
-		}
-
-		// Apply name filter
-		if (!NameFilter.IsEmpty())
-		{
-			if (!AssetData.AssetName.ToString().Contains(NameFilter, ESearchCase::IgnoreCase))
-			{
-				continue;
-			}
-		}
-
-		TotalMatching++;
-
-		// Check limit
-		if (Count >= Limit)
-		{
-			continue;
-		}
-
-		// Get Blueprint type
-		FString BlueprintType = TEXT("Normal");
-		FAssetDataTagMapSharedView::FFindTagResult TypeTag = AssetData.TagsAndValues.FindTag(FName("BlueprintType"));
-		if (TypeTag.IsSet())
-		{
-			BlueprintType = TypeTag.GetValue();
-		}
-
-		// Build result object
-		TSharedPtr<FJsonObject> BPJson = MakeShared<FJsonObject>();
-		BPJson->SetStringField(TEXT("name"), AssetData.AssetName.ToString());
-		BPJson->SetStringField(TEXT("path"), AssetData.GetObjectPathString());
-		BPJson->SetStringField(TEXT("blueprint_type"), BlueprintType);
-
-		// Clean up parent class name (remove prefix)
-		if (!ParentClassName.IsEmpty())
-		{
-			FString CleanParentName = ParentClassName;
-			int32 LastDotIndex;
-			if (CleanParentName.FindLastChar(TEXT('.'), LastDotIndex))
-			{
-				CleanParentName = CleanParentName.Mid(LastDotIndex + 1);
-			}
-			// Remove trailing '_C' from generated class names
-			if (CleanParentName.EndsWith(TEXT("_C")))
-			{
-				CleanParentName = CleanParentName.LeftChop(2);
-			}
-			BPJson->SetStringField(TEXT("parent_class"), CleanParentName);
-		}
-
-		ResultsArray.Add(MakeShared<FJsonValueObject>(BPJson));
-		Count++;
-	}
-
-	// Build response
-	TSharedPtr<FJsonObject> ResponseData = MakeShared<FJsonObject>();
-	ResponseData->SetArrayField(TEXT("blueprints"), ResultsArray);
-	ResponseData->SetNumberField(TEXT("count"), Count);
-	ResponseData->SetNumberField(TEXT("total_matching"), TotalMatching);
-
-	if (TotalMatching > Count)
-	{
-		ResponseData->SetBoolField(TEXT("truncated"), true);
-	}
-
-	return FMCPToolResult::Success(
-		FString::Printf(TEXT("Found %d Blueprints (showing %d)"), TotalMatching, Count),
-		ResponseData
-	);
-}
-
-FMCPToolResult FMCPTool_BlueprintQuery::ExecuteInspect(const TSharedRef<FJsonObject>& Params)
-{
-	// Get Blueprint path
 	FString BlueprintPath;
 	TOptional<FMCPToolResult> Error;
 	if (!ExtractRequiredString(Params, TEXT("blueprint_path"), BlueprintPath, Error))
 	{
-		return Error.GetValue();
+		LastError = Error.GetValue();
+		return nullptr;
 	}
 
-	// Validate path
 	FString ValidationError;
 	if (!FMCPParamValidator::ValidateBlueprintPath(BlueprintPath, ValidationError))
 	{
-		return FMCPToolResult::Error(ValidationError);
+		LastError = FMCPToolResult::Error(ValidationError);
+		return nullptr;
 	}
 
-	// Load Blueprint
 	FString LoadError;
 	UBlueprint* Blueprint = FBlueprintUtils::LoadBlueprint(BlueprintPath, LoadError);
 	if (!Blueprint)
 	{
-		return FMCPToolResult::Error(LoadError);
+		LastError = FMCPToolResult::Error(LoadError);
+		return nullptr;
 	}
 
-	// Get options
-	bool bIncludeVariables = ExtractOptionalBool(Params, TEXT("include_variables"), false);
-	bool bIncludeFunctions = ExtractOptionalBool(Params, TEXT("include_functions"), false);
-	bool bIncludeGraphs = ExtractOptionalBool(Params, TEXT("include_graphs"), false);
-
-	// Serialize Blueprint info
-	TSharedPtr<FJsonObject> BlueprintInfo = FBlueprintUtils::SerializeBlueprintInfo(
-		Blueprint,
-		bIncludeVariables,
-		bIncludeFunctions,
-		bIncludeGraphs
-	);
-
-	return FMCPToolResult::Success(
-		FString::Printf(TEXT("Blueprint info for: %s"), *Blueprint->GetName()),
-		BlueprintInfo
-	);
+	return Blueprint;
 }
 
-FMCPToolResult FMCPTool_BlueprintQuery::ExecuteGetGraph(const TSharedRef<FJsonObject>& Params)
+TArray<UEdGraph*> FMCPTool_BlueprintQuery::CollectGraphs(UBlueprint* Blueprint, const FString& GraphName)
 {
-	// Get Blueprint path
-	FString BlueprintPath;
+	TArray<UEdGraph*> Graphs;
+	if (!GraphName.IsEmpty())
+	{
+		FString FindError;
+		UEdGraph* Graph = FBlueprintGraphEditor::FindGraph(Blueprint, GraphName, true, FindError);
+		if (!Graph) Graph = FBlueprintGraphEditor::FindGraph(Blueprint, GraphName, false, FindError);
+		if (Graph) Graphs.Add(Graph);
+	}
+	else
+	{
+		Graphs.Append(Blueprint->UbergraphPages);
+		Graphs.Append(Blueprint->FunctionGraphs);
+		Graphs.Append(Blueprint->MacroGraphs);
+	}
+	return Graphs;
+}
+
+UEdGraphNode* FMCPTool_BlueprintQuery::FindNodeInGraphs(
+	const TArray<UEdGraph*>& Graphs, const FString& NodeId, FString& OutGraphName)
+{
+	for (UEdGraph* Graph : Graphs)
+	{
+		if (!Graph) continue;
+
+		// Try MCP ID first
+		UEdGraphNode* Node = FBlueprintGraphEditor::FindNodeById(Graph, NodeId);
+		if (Node)
+		{
+			OutGraphName = Graph->GetName();
+			return Node;
+		}
+
+		// Fallback: try matching NodeGuid
+		for (UEdGraphNode* N : Graph->Nodes)
+		{
+			if (N && N->NodeGuid.ToString() == NodeId)
+			{
+				OutGraphName = Graph->GetName();
+				return N;
+			}
+		}
+	}
+	return nullptr;
+}
+
+// --- New operations (get_nodes, get_variables, get_functions, get_node_pins, search_nodes, find_references) ---
+
+FMCPToolResult FMCPTool_BlueprintQuery::ExecuteGetNodes(const TSharedRef<FJsonObject>& Params)
+{
+	UBlueprint* Blueprint = LoadAndValidateBlueprint(Params);
+	if (!Blueprint) return LastError;
+
+	FString GraphName = ExtractOptionalString(Params, TEXT("graph_name"));
+	int32 Limit = FMath::Clamp(ExtractOptionalNumber<int32>(Params, TEXT("limit"), 100), 1, 1000);
+
+	TArray<UEdGraph*> TargetGraphs = CollectGraphs(Blueprint, GraphName);
+	if (TargetGraphs.Num() == 0 && !GraphName.IsEmpty())
+	{
+		return FMCPToolResult::Error(FString::Printf(TEXT("Graph '%s' not found"), *GraphName));
+	}
+
+	TArray<TSharedPtr<FJsonValue>> NodesArray;
+	int32 TotalNodes = 0;
+
+	for (UEdGraph* Graph : TargetGraphs)
+	{
+		if (!Graph) continue;
+		for (UEdGraphNode* Node : Graph->Nodes)
+		{
+			if (!Node) continue;
+			TotalNodes++;
+			if (NodesArray.Num() >= Limit) continue;
+
+			TSharedPtr<FJsonObject> NodeObj = FBlueprintGraphEditor::SerializeNodeInfo(Node);
+			NodeObj->SetStringField(TEXT("title"), Node->GetNodeTitle(ENodeTitleType::FullTitle).ToString());
+			NodeObj->SetStringField(TEXT("node_guid"), Node->NodeGuid.ToString());
+			NodeObj->SetStringField(TEXT("graph"), Graph->GetName());
+			NodesArray.Add(MakeShared<FJsonValueObject>(NodeObj));
+		}
+	}
+
+	TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetArrayField(TEXT("nodes"), NodesArray);
+	Result->SetNumberField(TEXT("count"), NodesArray.Num());
+	Result->SetNumberField(TEXT("total"), TotalNodes);
+
+	return FMCPToolResult::Success(
+		FString::Printf(TEXT("Found %d nodes (showing %d)"), TotalNodes, NodesArray.Num()), Result);
+}
+
+FMCPToolResult FMCPTool_BlueprintQuery::ExecuteGetVariables(const TSharedRef<FJsonObject>& Params)
+{
+	UBlueprint* Blueprint = LoadAndValidateBlueprint(Params);
+	if (!Blueprint) return LastError;
+
+	TArray<TSharedPtr<FJsonValue>> Variables = FBlueprintUtils::GetBlueprintVariables(Blueprint);
+
+	TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetArrayField(TEXT("variables"), Variables);
+	Result->SetNumberField(TEXT("count"), Variables.Num());
+
+	return FMCPToolResult::Success(
+		FString::Printf(TEXT("Found %d variables"), Variables.Num()), Result);
+}
+
+FMCPToolResult FMCPTool_BlueprintQuery::ExecuteGetFunctions(const TSharedRef<FJsonObject>& Params)
+{
+	UBlueprint* Blueprint = LoadAndValidateBlueprint(Params);
+	if (!Blueprint) return LastError;
+
+	TArray<TSharedPtr<FJsonValue>> Functions = FBlueprintUtils::GetBlueprintFunctions(Blueprint);
+
+	TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetArrayField(TEXT("functions"), Functions);
+	Result->SetNumberField(TEXT("count"), Functions.Num());
+
+	return FMCPToolResult::Success(
+		FString::Printf(TEXT("Found %d functions/events"), Functions.Num()), Result);
+}
+
+FMCPToolResult FMCPTool_BlueprintQuery::ExecuteGetNodePins(const TSharedRef<FJsonObject>& Params)
+{
+	UBlueprint* Blueprint = LoadAndValidateBlueprint(Params);
+	if (!Blueprint) return LastError;
+
+	FString NodeId;
 	TOptional<FMCPToolResult> Error;
-	if (!ExtractRequiredString(Params, TEXT("blueprint_path"), BlueprintPath, Error))
+	if (!ExtractRequiredString(Params, TEXT("node_id"), NodeId, Error))
 	{
 		return Error.GetValue();
 	}
 
-	// Validate path
-	FString ValidationError;
-	if (!FMCPParamValidator::ValidateBlueprintPath(BlueprintPath, ValidationError))
+	FString GraphName = ExtractOptionalString(Params, TEXT("graph_name"));
+	TArray<UEdGraph*> SearchGraphs = CollectGraphs(Blueprint, GraphName);
+	if (SearchGraphs.Num() == 0 && !GraphName.IsEmpty())
 	{
-		return FMCPToolResult::Error(ValidationError);
+		return FMCPToolResult::Error(FString::Printf(TEXT("Graph '%s' not found"), *GraphName));
 	}
 
-	// Load Blueprint
-	FString LoadError;
-	UBlueprint* Blueprint = FBlueprintUtils::LoadBlueprint(BlueprintPath, LoadError);
-	if (!Blueprint)
+	// FindNodeInGraphs tries MCP ID first, then NodeGuid fallback
+	FString FoundGraphName;
+	UEdGraphNode* FoundNode = FindNodeInGraphs(SearchGraphs, NodeId, FoundGraphName);
+	if (!FoundNode)
 	{
-		return FMCPToolResult::Error(LoadError);
+		return FMCPToolResult::Error(FString::Printf(TEXT("Node '%s' not found"), *NodeId));
 	}
 
-	// Get graph info
-	TSharedPtr<FJsonObject> GraphInfo = FBlueprintUtils::GetGraphInfo(Blueprint);
+	// Serialize pins with connection targets
+	TArray<TSharedPtr<FJsonValue>> PinsArray;
+	for (UEdGraphPin* Pin : FoundNode->Pins)
+	{
+		if (!Pin) continue;
 
-	// Add Blueprint name for context
-	GraphInfo->SetStringField(TEXT("blueprint_name"), Blueprint->GetName());
-	GraphInfo->SetStringField(TEXT("blueprint_path"), Blueprint->GetPathName());
+		TSharedPtr<FJsonObject> PinObj = MakeShared<FJsonObject>();
+		PinObj->SetStringField(TEXT("name"), Pin->PinName.ToString());
+		PinObj->SetStringField(TEXT("direction"), Pin->Direction == EGPD_Input ? TEXT("Input") : TEXT("Output"));
+		PinObj->SetStringField(TEXT("type"), FBlueprintEditor::PinTypeToString(Pin->PinType));
+
+		if (!Pin->DefaultValue.IsEmpty())
+		{
+			PinObj->SetStringField(TEXT("default_value"), Pin->DefaultValue);
+		}
+
+		// Connection targets — include both MCP ID and GUID for graph traversal
+		TArray<TSharedPtr<FJsonValue>> Connections;
+		for (UEdGraphPin* LinkedPin : Pin->LinkedTo)
+		{
+			if (!LinkedPin || !LinkedPin->GetOwningNode()) continue;
+			UEdGraphNode* LinkedNode = LinkedPin->GetOwningNode();
+
+			TSharedPtr<FJsonObject> ConnObj = MakeShared<FJsonObject>();
+			ConnObj->SetStringField(TEXT("node_id"), FBlueprintGraphEditor::GetNodeId(LinkedNode));
+			ConnObj->SetStringField(TEXT("node_guid"), LinkedNode->NodeGuid.ToString());
+			ConnObj->SetStringField(TEXT("pin_name"), LinkedPin->PinName.ToString());
+			Connections.Add(MakeShared<FJsonValueObject>(ConnObj));
+		}
+		PinObj->SetArrayField(TEXT("connected_to"), Connections);
+
+		PinsArray.Add(MakeShared<FJsonValueObject>(PinObj));
+	}
+
+	TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("node_id"), FBlueprintGraphEditor::GetNodeId(FoundNode));
+	Result->SetStringField(TEXT("node_guid"), FoundNode->NodeGuid.ToString());
+	Result->SetStringField(TEXT("node_class"), FoundNode->GetClass()->GetName());
+	Result->SetStringField(TEXT("node_title"), FoundNode->GetNodeTitle(ENodeTitleType::FullTitle).ToString());
+	Result->SetStringField(TEXT("graph"), FoundGraphName);
+	Result->SetArrayField(TEXT("pins"), PinsArray);
+	Result->SetNumberField(TEXT("pin_count"), PinsArray.Num());
 
 	return FMCPToolResult::Success(
-		FString::Printf(TEXT("Graph info for: %s"), *Blueprint->GetName()),
-		GraphInfo
-	);
+		FString::Printf(TEXT("Node '%s' has %d pins"), *NodeId, PinsArray.Num()), Result);
+}
+
+FMCPToolResult FMCPTool_BlueprintQuery::ExecuteSearchNodes(const TSharedRef<FJsonObject>& Params)
+{
+	UBlueprint* Blueprint = LoadAndValidateBlueprint(Params);
+	if (!Blueprint) return LastError;
+
+	FString Query;
+	TOptional<FMCPToolResult> Error;
+	if (!ExtractRequiredString(Params, TEXT("query"), Query, Error))
+	{
+		return Error.GetValue();
+	}
+
+	FString GraphName = ExtractOptionalString(Params, TEXT("graph_name"));
+	int32 Limit = FMath::Clamp(ExtractOptionalNumber<int32>(Params, TEXT("limit"), 50), 1, 500);
+
+	TArray<UEdGraph*> SearchGraphs = CollectGraphs(Blueprint, GraphName);
+	if (SearchGraphs.Num() == 0 && !GraphName.IsEmpty())
+	{
+		return FMCPToolResult::Error(FString::Printf(TEXT("Graph '%s' not found"), *GraphName));
+	}
+
+	TArray<TSharedPtr<FJsonValue>> Matches;
+	int32 TotalMatches = 0;
+
+	for (UEdGraph* Graph : SearchGraphs)
+	{
+		if (!Graph) continue;
+		for (UEdGraphNode* Node : Graph->Nodes)
+		{
+			if (!Node) continue;
+
+			FString Title = Node->GetNodeTitle(ENodeTitleType::FullTitle).ToString();
+			FString ClassName = Node->GetClass()->GetName();
+
+			if (!Title.Contains(Query, ESearchCase::IgnoreCase) &&
+				!ClassName.Contains(Query, ESearchCase::IgnoreCase))
+			{
+				continue;
+			}
+
+			TotalMatches++;
+			if (Matches.Num() >= Limit) continue;
+
+			TSharedPtr<FJsonObject> NodeObj = FBlueprintGraphEditor::SerializeNodeInfo(Node);
+			NodeObj->SetStringField(TEXT("title"), Title);
+			NodeObj->SetStringField(TEXT("node_guid"), Node->NodeGuid.ToString());
+			NodeObj->SetStringField(TEXT("graph"), Graph->GetName());
+			Matches.Add(MakeShared<FJsonValueObject>(NodeObj));
+		}
+	}
+
+	TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("query"), Query);
+	Result->SetArrayField(TEXT("matches"), Matches);
+	Result->SetNumberField(TEXT("count"), Matches.Num());
+	Result->SetNumberField(TEXT("total_matches"), TotalMatches);
+
+	return FMCPToolResult::Success(
+		FString::Printf(TEXT("Found %d nodes matching '%s' (showing %d)"), TotalMatches, *Query, Matches.Num()), Result);
+}
+
+FMCPToolResult FMCPTool_BlueprintQuery::ExecuteFindReferences(const TSharedRef<FJsonObject>& Params)
+{
+	UBlueprint* Blueprint = LoadAndValidateBlueprint(Params);
+	if (!Blueprint) return LastError;
+
+	FString RefName;
+	TOptional<FMCPToolResult> Error;
+	if (!ExtractRequiredString(Params, TEXT("ref_name"), RefName, Error))
+	{
+		return Error.GetValue();
+	}
+
+	FString RefType = ExtractOptionalString(Params, TEXT("ref_type")).ToLower();
+	bool bSearchVariables = RefType.IsEmpty() || RefType == TEXT("variable");
+	bool bSearchFunctions = RefType.IsEmpty() || RefType == TEXT("function");
+	int32 Limit = FMath::Clamp(ExtractOptionalNumber<int32>(Params, TEXT("limit"), 100), 1, 1000);
+
+	// Use FName for case-insensitive comparison (FName is case-preserving but compares case-insensitive)
+	FName RefFName(*RefName);
+
+	TArray<TSharedPtr<FJsonValue>> References;
+	int32 TotalMatches = 0;
+
+	// Search all graphs including macros
+	TArray<UEdGraph*> AllGraphs = CollectGraphs(Blueprint, FString());
+
+	for (UEdGraph* Graph : AllGraphs)
+	{
+		if (!Graph) continue;
+
+		for (UEdGraphNode* Node : Graph->Nodes)
+		{
+			if (!Node) continue;
+			bool bMatched = false;
+
+			// Check variable references (case-insensitive via FName)
+			if (bSearchVariables)
+			{
+				if (UK2Node_Variable* VarNode = Cast<UK2Node_Variable>(Node))
+				{
+					if (VarNode->GetVarName() == RefFName)
+					{
+						bMatched = true;
+					}
+				}
+			}
+
+			// Check function call references (case-insensitive via FName)
+			if (!bMatched && bSearchFunctions)
+			{
+				if (UK2Node_CallFunction* CallNode = Cast<UK2Node_CallFunction>(Node))
+				{
+					if (CallNode->FunctionReference.GetMemberName() == RefFName)
+					{
+						bMatched = true;
+					}
+				}
+			}
+
+			if (bMatched)
+			{
+				TotalMatches++;
+				if (References.Num() >= Limit) continue;
+
+				TSharedPtr<FJsonObject> RefObj = MakeShared<FJsonObject>();
+				RefObj->SetStringField(TEXT("node_id"), FBlueprintGraphEditor::GetNodeId(Node));
+				RefObj->SetStringField(TEXT("node_guid"), Node->NodeGuid.ToString());
+				RefObj->SetStringField(TEXT("node_class"), Node->GetClass()->GetName());
+				RefObj->SetStringField(TEXT("node_title"), Node->GetNodeTitle(ENodeTitleType::FullTitle).ToString());
+				RefObj->SetStringField(TEXT("graph"), Graph->GetName());
+				RefObj->SetNumberField(TEXT("pos_x"), Node->NodePosX);
+				RefObj->SetNumberField(TEXT("pos_y"), Node->NodePosY);
+				References.Add(MakeShared<FJsonValueObject>(RefObj));
+			}
+		}
+	}
+
+	TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+	Result->SetStringField(TEXT("ref_name"), RefName);
+	Result->SetStringField(TEXT("ref_type"), RefType.IsEmpty() ? TEXT("any") : *RefType);
+	Result->SetArrayField(TEXT("references"), References);
+	Result->SetNumberField(TEXT("count"), References.Num());
+	Result->SetNumberField(TEXT("total_matches"), TotalMatches);
+
+	return FMCPToolResult::Success(
+		FString::Printf(TEXT("Found %d references to '%s' (showing %d)"), TotalMatches, *RefName, References.Num()), Result);
 }

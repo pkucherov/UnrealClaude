@@ -1459,6 +1459,125 @@ bool FMCPTool_BlueprintQuery_GetInfo::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FMCPTool_BlueprintQuery_NewOps,
+	"UnrealClaude.MCP.Tools.BlueprintQuery.NewOperationParams",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
+)
+
+bool FMCPTool_BlueprintQuery_NewOps::RunTest(const FString& Parameters)
+{
+	FMCPToolRegistry Registry;
+	IMCPTool* Tool = Registry.FindTool(TEXT("blueprint_query"));
+	TestNotNull("blueprint_query tool should exist", Tool);
+	if (!Tool) return false;
+
+	FMCPToolInfo Info = Tool->GetInfo();
+
+	// Verify new parameters exist
+	TSet<FString> ParamNames;
+	for (const FMCPToolParameter& Param : Info.Parameters)
+	{
+		ParamNames.Add(Param.Name);
+	}
+
+	TestTrue("Should have graph_name param", ParamNames.Contains(TEXT("graph_name")));
+	TestTrue("Should have node_id param", ParamNames.Contains(TEXT("node_id")));
+	TestTrue("Should have query param", ParamNames.Contains(TEXT("query")));
+	TestTrue("Should have ref_name param", ParamNames.Contains(TEXT("ref_name")));
+	TestTrue("Should have ref_type param", ParamNames.Contains(TEXT("ref_type")));
+
+	// Verify operation description lists new ops
+	for (const FMCPToolParameter& Param : Info.Parameters)
+	{
+		if (Param.Name == TEXT("operation"))
+		{
+			TestTrue("Operation desc should mention get_nodes",
+				Param.Description.Contains(TEXT("get_nodes")));
+			TestTrue("Operation desc should mention find_references",
+				Param.Description.Contains(TEXT("find_references")));
+			break;
+		}
+	}
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FMCPTool_BlueprintQuery_UnknownOp,
+	"UnrealClaude.MCP.Tools.BlueprintQuery.UnknownOperation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
+)
+
+bool FMCPTool_BlueprintQuery_UnknownOp::RunTest(const FString& Parameters)
+{
+	FMCPToolRegistry Registry;
+	IMCPTool* Tool = Registry.FindTool(TEXT("blueprint_query"));
+	TestNotNull("Tool should exist", Tool);
+	if (!Tool) return false;
+
+	TSharedRef<FJsonObject> Params = MakeShared<FJsonObject>();
+	Params->SetStringField(TEXT("operation"), TEXT("nonexistent_op"));
+
+	FMCPToolResult Result = Tool->Execute(Params);
+	TestFalse("Should fail for unknown operation", Result.bSuccess);
+	TestTrue("Error should mention valid operations",
+		Result.Message.Contains(TEXT("get_nodes")));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FMCPTool_BlueprintQuery_MissingRequiredParams,
+	"UnrealClaude.MCP.Tools.BlueprintQuery.MissingRequiredParams",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
+)
+
+bool FMCPTool_BlueprintQuery_MissingRequiredParams::RunTest(const FString& Parameters)
+{
+	FMCPToolRegistry Registry;
+	IMCPTool* Tool = Registry.FindTool(TEXT("blueprint_query"));
+	TestNotNull("Tool should exist", Tool);
+	if (!Tool) return false;
+
+	// get_nodes: missing blueprint_path
+	{
+		TSharedRef<FJsonObject> Params = MakeShared<FJsonObject>();
+		Params->SetStringField(TEXT("operation"), TEXT("get_nodes"));
+		FMCPToolResult Result = Tool->Execute(Params);
+		TestFalse("get_nodes without blueprint_path should fail", Result.bSuccess);
+	}
+
+	// get_node_pins: missing node_id (will fail on blueprint_path first)
+	{
+		TSharedRef<FJsonObject> Params = MakeShared<FJsonObject>();
+		Params->SetStringField(TEXT("operation"), TEXT("get_node_pins"));
+		Params->SetStringField(TEXT("blueprint_path"), TEXT("/Game/NonExistent"));
+		FMCPToolResult Result = Tool->Execute(Params);
+		TestFalse("get_node_pins without node_id should fail", Result.bSuccess);
+	}
+
+	// search_nodes: missing query
+	{
+		TSharedRef<FJsonObject> Params = MakeShared<FJsonObject>();
+		Params->SetStringField(TEXT("operation"), TEXT("search_nodes"));
+		Params->SetStringField(TEXT("blueprint_path"), TEXT("/Game/NonExistent"));
+		FMCPToolResult Result = Tool->Execute(Params);
+		TestFalse("search_nodes without query should fail", Result.bSuccess);
+	}
+
+	// find_references: missing ref_name
+	{
+		TSharedRef<FJsonObject> Params = MakeShared<FJsonObject>();
+		Params->SetStringField(TEXT("operation"), TEXT("find_references"));
+		Params->SetStringField(TEXT("blueprint_path"), TEXT("/Game/NonExistent"));
+		FMCPToolResult Result = Tool->Execute(Params);
+		TestFalse("find_references without ref_name should fail", Result.bSuccess);
+	}
+
+	return true;
+}
+
 // ===== Blueprint Modify Tool Tests =====
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
