@@ -5,13 +5,13 @@
 #include "CoreMinimal.h"
 
 /**
- * Manages Claude conversation session persistence and history
- * Single responsibility: session storage and retrieval
+ * Manages chat conversation session persistence and history.
+ * Backend-agnostic — shared across all backends.
  */
-class UNREALCLAUDE_API FClaudeSessionManager
+class UNREALCLAUDE_API FChatSessionManager
 {
 public:
-	FClaudeSessionManager();
+	FChatSessionManager();
 
 	/** Get conversation history */
 	const TArray<TPair<FString, FString>>& GetHistory() const { return ConversationHistory; }

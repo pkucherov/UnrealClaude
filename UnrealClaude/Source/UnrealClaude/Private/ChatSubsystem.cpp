@@ -1,8 +1,10 @@
 // Copyright Natali Caggiano. All Rights Reserved.
 
-#include "ClaudeSubsystem.h"
-#include "ClaudeCodeRunner.h"
-#include "ClaudeSessionManager.h"
+#include "ChatSubsystem.h"
+#include "IChatBackend.h"
+#include "ChatSessionManager.h"
+#include "ChatBackendFactory.h"
+#include "ClaudeRequestConfig.h"
 #include "ProjectContext.h"
 #include "ScriptExecutionManager.h"
 #include "UnrealClaudeModule.h"
@@ -65,64 +67,78 @@ RESPONSE FORMAT:
 - Mention relevant documentation or resources
 - Warn about common pitfalls)");
 
-FClaudeCodeSubsystem& FClaudeCodeSubsystem::Get()
+FChatSubsystem& FChatSubsystem::Get()
 {
-	static FClaudeCodeSubsystem Instance;
+	static FChatSubsystem Instance;
 	return Instance;
 }
 
-FClaudeCodeSubsystem::FClaudeCodeSubsystem()
+FChatSubsystem::FChatSubsystem()
 {
-	Runner = MakeUnique<FClaudeCodeRunner>();
-	SessionManager = MakeUnique<FClaudeSessionManager>();
+	// Detect preferred backend and create it via factory
+	ActiveBackendType = FChatBackendFactory::DetectPreferredBackend();
+	Backend = FChatBackendFactory::Create(ActiveBackendType);
+	SessionManager = MakeUnique<FChatSessionManager>();
 }
 
-FClaudeCodeSubsystem::~FClaudeCodeSubsystem()
+FChatSubsystem::~FChatSubsystem()
 {
 	// Destructor defined here where full types are available
 	// TUniquePtr will properly destroy the objects
 }
 
-IClaudeRunner* FClaudeCodeSubsystem::GetRunner() const
+IChatBackend* FChatSubsystem::GetBackend() const
 {
-	return Runner.Get();
+	return Backend.Get();
 }
 
-void FClaudeCodeSubsystem::SendPrompt(
+void FChatSubsystem::SendPrompt(
 	const FString& Prompt,
-	FOnClaudeResponse OnComplete,
-	const FClaudePromptOptions& Options)
+	FOnChatResponse OnComplete,
+	const FChatPromptOptions& Options)
 {
-	FClaudeRequestConfig Config;
+	// Use backend to create the right config type
+	TUniquePtr<FChatRequestConfig> Config = Backend->CreateConfig();
 
-	// Build prompt with conversation history context
-	Config.Prompt = BuildPromptWithHistory(Prompt);
-	Config.WorkingDirectory = FPaths::ProjectDir();
-	Config.bSkipPermissions = true;
-	Config.AllowedTools = { TEXT("Read"), TEXT("Write"), TEXT("Edit"), TEXT("Grep"), TEXT("Glob"), TEXT("Bash") };
-
-	Config.AttachedImagePaths = Options.AttachedImagePaths;
+	// Format prompt with history using backend-specific format
+	const TArray<TPair<FString, FString>>& History = GetHistory();
+	FString SystemPrompt;
 
 	if (Options.bIncludeEngineContext)
 	{
-		Config.SystemPrompt = GetUE57SystemPrompt();
+		SystemPrompt = GetUE57SystemPrompt();
 	}
 
+	FString ProjectContext;
 	if (Options.bIncludeProjectContext)
 	{
-		Config.SystemPrompt += GetProjectContextPrompt();
+		ProjectContext = GetProjectContextPrompt();
+		SystemPrompt += ProjectContext;
 	}
 
 	if (!CustomSystemPrompt.IsEmpty())
 	{
-		Config.SystemPrompt += TEXT("\n\n") + CustomSystemPrompt;
+		SystemPrompt += TEXT("\n\n") + CustomSystemPrompt;
 	}
 
-	// Pass structured event delegate through to runner config
-	Config.OnStreamEvent = Options.OnStreamEvent;
+	// Build prompt with conversation history via backend
+	FString FormattedHistory = Backend->FormatPrompt(History, SystemPrompt, ProjectContext);
+	if (!FormattedHistory.IsEmpty())
+	{
+		Config->Prompt = FormattedHistory + Prompt;
+	}
+	else
+	{
+		Config->Prompt = Prompt;
+	}
+
+	Config->SystemPrompt = SystemPrompt;
+	Config->WorkingDirectory = FPaths::ProjectDir();
+	Config->AttachedImagePaths = Options.AttachedImagePaths;
+	Config->OnStreamEvent = Options.OnStreamEvent;
 
 	// Wrap completion to store history and save session
-	FOnClaudeResponse WrappedComplete;
+	FOnChatResponse WrappedComplete;
 	WrappedComplete.BindLambda([this, Prompt, OnComplete](const FString& Response, bool bSuccess)
 	{
 		if (bSuccess && SessionManager.IsValid())
@@ -133,31 +149,31 @@ void FClaudeCodeSubsystem::SendPrompt(
 		OnComplete.ExecuteIfBound(Response, bSuccess);
 	});
 
-	Runner->ExecuteAsync(Config, WrappedComplete, Options.OnProgress);
+	Backend->ExecuteAsync(*Config, WrappedComplete, Options.OnProgress);
 }
 
-void FClaudeCodeSubsystem::SendPrompt(
+void FChatSubsystem::SendPrompt(
 	const FString& Prompt,
-	FOnClaudeResponse OnComplete,
+	FOnChatResponse OnComplete,
 	bool bIncludeUE57Context,
-	FOnClaudeProgress OnProgress,
+	FOnChatProgress OnProgress,
 	bool bIncludeProjectContext)
 {
 	// Legacy API - delegate to new API
-	FClaudePromptOptions Options;
+	FChatPromptOptions Options;
 	Options.bIncludeEngineContext = bIncludeUE57Context;
 	Options.bIncludeProjectContext = bIncludeProjectContext;
 	Options.OnProgress = OnProgress;
 	SendPrompt(Prompt, OnComplete, Options);
 }
 
-FString FClaudeCodeSubsystem::GetUE57SystemPrompt() const
+FString FChatSubsystem::GetUE57SystemPrompt() const
 {
 	// Return cached static prompt to avoid string recreation
 	return CachedUE57SystemPrompt;
 }
 
-FString FClaudeCodeSubsystem::GetProjectContextPrompt() const
+FString FChatSubsystem::GetProjectContextPrompt() const
 {
 	FString Context = FProjectContextManager::Get().FormatContextForPrompt();
 
@@ -171,12 +187,12 @@ FString FClaudeCodeSubsystem::GetProjectContextPrompt() const
 	return Context;
 }
 
-void FClaudeCodeSubsystem::SetCustomSystemPrompt(const FString& InCustomPrompt)
+void FChatSubsystem::SetCustomSystemPrompt(const FString& InCustomPrompt)
 {
 	CustomSystemPrompt = InCustomPrompt;
 }
 
-const TArray<TPair<FString, FString>>& FClaudeCodeSubsystem::GetHistory() const
+const TArray<TPair<FString, FString>>& FChatSubsystem::GetHistory() const
 {
 	static TArray<TPair<FString, FString>> EmptyHistory;
 	if (SessionManager.IsValid())
@@ -186,7 +202,7 @@ const TArray<TPair<FString, FString>>& FClaudeCodeSubsystem::GetHistory() const
 	return EmptyHistory;
 }
 
-void FClaudeCodeSubsystem::ClearHistory()
+void FChatSubsystem::ClearHistory()
 {
 	if (SessionManager.IsValid())
 	{
@@ -194,15 +210,15 @@ void FClaudeCodeSubsystem::ClearHistory()
 	}
 }
 
-void FClaudeCodeSubsystem::CancelCurrentRequest()
+void FChatSubsystem::CancelCurrentRequest()
 {
-	if (Runner.IsValid())
+	if (Backend.IsValid())
 	{
-		Runner->Cancel();
+		Backend->Cancel();
 	}
 }
 
-bool FClaudeCodeSubsystem::SaveSession()
+bool FChatSubsystem::SaveSession()
 {
 	if (SessionManager.IsValid())
 	{
@@ -211,7 +227,7 @@ bool FClaudeCodeSubsystem::SaveSession()
 	return false;
 }
 
-bool FClaudeCodeSubsystem::LoadSession()
+bool FChatSubsystem::LoadSession()
 {
 	if (SessionManager.IsValid())
 	{
@@ -220,7 +236,7 @@ bool FClaudeCodeSubsystem::LoadSession()
 	return false;
 }
 
-bool FClaudeCodeSubsystem::HasSavedSession() const
+bool FChatSubsystem::HasSavedSession() const
 {
 	if (SessionManager.IsValid())
 	{
@@ -229,7 +245,7 @@ bool FClaudeCodeSubsystem::HasSavedSession() const
 	return false;
 }
 
-FString FClaudeCodeSubsystem::GetSessionFilePath() const
+FString FChatSubsystem::GetSessionFilePath() const
 {
 	if (SessionManager.IsValid())
 	{
@@ -238,31 +254,38 @@ FString FClaudeCodeSubsystem::GetSessionFilePath() const
 	return FString();
 }
 
-FString FClaudeCodeSubsystem::BuildPromptWithHistory(const FString& NewPrompt) const
+// ===== Backend Abstraction Methods =====
+
+void FChatSubsystem::SetActiveBackend(EChatBackendType Type)
 {
-	if (!SessionManager.IsValid())
+	// Block swap during active request (per D-14)
+	if (Backend.IsValid() && Backend->IsExecuting())
 	{
-		return NewPrompt;
+		UE_LOG(LogUnrealClaude, Warning, TEXT("Cannot switch backend while a request is active"));
+		return;
 	}
 
-	const TArray<TPair<FString, FString>>& History = SessionManager->GetHistory();
-	if (History.Num() == 0)
+	ActiveBackendType = Type;
+	Backend = FChatBackendFactory::Create(Type);
+	UE_LOG(LogUnrealClaude, Log, TEXT("Active backend switched to: %s"),
+		*ChatBackendUtils::EnumToString(Type));
+}
+
+EChatBackendType FChatSubsystem::GetActiveBackendType() const
+{
+	return ActiveBackendType;
+}
+
+bool FChatSubsystem::IsBackendAvailable() const
+{
+	return Backend.IsValid() && Backend->IsAvailable();
+}
+
+FString FChatSubsystem::GetBackendDisplayName() const
+{
+	if (Backend.IsValid())
 	{
-		return NewPrompt;
+		return Backend->GetDisplayName();
 	}
-
-	FString PromptWithHistory;
-
-	// Include recent history (limit to last N exchanges)
-	int32 StartIndex = FMath::Max(0, History.Num() - UnrealClaudeConstants::Session::MaxHistoryInPrompt);
-
-	for (int32 i = StartIndex; i < History.Num(); ++i)
-	{
-		const TPair<FString, FString>& Exchange = History[i];
-		PromptWithHistory += FString::Printf(TEXT("Human: %s\n\nAssistant: %s\n\n"), *Exchange.Key, *Exchange.Value);
-	}
-
-	PromptWithHistory += FString::Printf(TEXT("Human: %s"), *NewPrompt);
-
-	return PromptWithHistory;
+	return TEXT("Unknown");
 }

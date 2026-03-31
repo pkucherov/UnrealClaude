@@ -1,6 +1,6 @@
 // Copyright Natali Caggiano. All Rights Reserved.
 
-#include "ClaudeSessionManager.h"
+#include "ChatSessionManager.h"
 #include "UnrealClaudeConstants.h"
 #include "JsonUtils.h"
 #include "UnrealClaudeModule.h"
@@ -8,12 +8,12 @@
 #include "Misc/FileHelper.h"
 #include "HAL/FileManager.h"
 
-FClaudeSessionManager::FClaudeSessionManager()
+FChatSessionManager::FChatSessionManager()
 	: MaxHistorySize(UnrealClaudeConstants::Session::MaxHistorySize)
 {
 }
 
-void FClaudeSessionManager::AddExchange(const FString& Prompt, const FString& Response)
+void FChatSessionManager::AddExchange(const FString& Prompt, const FString& Response)
 {
 	ConversationHistory.Add(TPair<FString, FString>(Prompt, Response));
 
@@ -24,23 +24,23 @@ void FClaudeSessionManager::AddExchange(const FString& Prompt, const FString& Re
 	}
 }
 
-void FClaudeSessionManager::ClearHistory()
+void FChatSessionManager::ClearHistory()
 {
 	ConversationHistory.Empty();
 }
 
-FString FClaudeSessionManager::GetSessionFilePath() const
+FString FChatSessionManager::GetSessionFilePath() const
 {
 	FString SaveDir = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("UnrealClaude"));
 	return FPaths::Combine(SaveDir, TEXT("session.json"));
 }
 
-bool FClaudeSessionManager::HasSavedSession() const
+bool FChatSessionManager::HasSavedSession() const
 {
 	return IFileManager::Get().FileExists(*GetSessionFilePath());
 }
 
-bool FClaudeSessionManager::SaveSession()
+bool FChatSessionManager::SaveSession()
 {
 	if (ConversationHistory.Num() == 0)
 	{
@@ -93,7 +93,7 @@ bool FClaudeSessionManager::SaveSession()
 	return true;
 }
 
-bool FClaudeSessionManager::LoadSession()
+bool FChatSessionManager::LoadSession()
 {
 	FString SessionPath = GetSessionFilePath();
 
