@@ -39,217 +39,286 @@ bool FMCPTaskQueue_Create::RunTest(const FString& Parameters)
 }
 
 // ============================================================================
-// KNOWN ISSUE: FRunnableThread tests disabled due to deadlock potential in
-// Unreal Engine's automation test context.
+// KNOWN ISSUE: FRunnableThread tests and the GameThread deadlock.
 //
 // ROOT CAUSE: The UE automation test framework runs tests on the game thread.
 // When FMCPTaskQueue::Start() creates an FRunnableThread, the worker thread
-// dispatches tool execution back to the game thread via AsyncTask(GameThread).
-// This creates a circular dependency:
-//   1. Test (GameThread) calls Start() -> creates worker thread
-//   2. Worker thread calls ExecuteTool() -> dispatches to GameThread
-//   3. GameThread is blocked waiting for test to complete
-//   4. Worker thread waits for GameThread -> DEADLOCK
+// dispatches tool execution back to the game thread via FTSTicker / AsyncTask.
+// With IMPLEMENT_SIMPLE_AUTOMATION_TEST (synchronous), the GameThread is
+// blocked inside RunTest(), so the dispatch never completes — DEADLOCK.
 //
-// Additionally, FRunnableThread::Kill(true) waits for thread completion, but
-// if the thread is blocked on a GameThread dispatch that never completes
-// (because GameThread is waiting for Kill), a freeze occurs.
+// LATENT TEST APPROACH (attempted 2026-03-31):
+// Using IMPLEMENT_COMPLEX_AUTOMATION_TEST with ADD_LATENT_AUTOMATION_COMMAND,
+// the test's RunTest() enqueues latent commands and returns immediately.
+// The GameThread is then free to process ticks between latent command
+// Update() calls, which should allow FTSTicker dispatches from the worker
+// thread to execute. Shutdown() via latent command also runs on a tick
+// boundary where the GameThread is responsive.
 //
-// WHY THIS HAPPENS SPECIFICALLY IN TESTS:
-// - Normal editor operation: GameThread processes events between MCP requests
-// - Automation tests: GameThread is blocked executing RunTest() synchronously
-// - The AsyncTask(GameThread) from the worker never gets processed
-// - FRunnableThread::Kill() deadlocks waiting for thread to exit
+// This approach should resolve the original deadlock because:
+//   1. RunTest() returns immediately after queuing latent commands
+//   2. GameThread processes ticks (FTSTicker, AsyncTask) between updates
+//   3. Worker thread dispatches to GameThread complete normally
+//   4. Shutdown latent command calls StopTaskQueue on a tick boundary
 //
-// VERIFICATION: The task queue works correctly in normal editor operation
-// where the game thread is not blocked by test execution. The MCP bridge
-// uses the task queue successfully for async tool execution.
+// RISK: If tool execution during tests causes editor-state side effects
+// (e.g., get_level_actors accessing the editor world), results may vary
+// depending on test environment state. Timeout protection is included.
 //
-// WORKAROUNDS ATTEMPTED:
-//   - Short Sleep() after Start/Stop: Still causes freezes
-//   - Using FPlatformProcess::Sleep in worker loop: Helps CPU but not deadlock
-//   - Non-blocking socket patterns: Not applicable (not socket-based)
-//   - Latent automation tests: Adds complexity, still has synchronization issues
-//
-// POTENTIAL FUTURE SOLUTIONS:
-//   - Use ADD_LATENT_AUTOMATION_COMMAND with async completion tracking
-//   - Mock the game thread dispatch for testing purposes
-//   - Test with EAutomationTestFlags::ClientContext to run outside main thread
-//   - Use FAutomationTestFramework::EnqueueLatentCommand for multi-frame tests
-//
-// SAFE TO LEAVE DISABLED: Yes. The task queue functionality is tested by:
-//   - Non-threading tests below (CancelPendingTask, GetAllTasks, GetStats, etc.)
-//     that submit tasks without starting the worker thread
-//   - Manual editor testing of the MCP bridge
-//   - The task tools themselves (task_submit, task_status, etc.) which test
-//     the data structures without requiring thread execution
-//   - Integration testing via the Node.js MCP bridge
+// VERIFICATION: The task queue works correctly in normal editor operation.
+// The MCP bridge uses the task queue successfully for async tool execution.
 //
 // REFERENCES:
 //   - UE Forums: FRunnable thread freezes editor
 //     https://forums.unrealengine.com/t/frunnable-thread-freezes-editor/365196
 //   - UE Bug UE-352373: Deadlock in animation evaluation with threads
-//   - UE Bug UE-177022: GameThread/AsyncLoadingThread deadlock
 //   - UE Docs: Automation Driver warns against synchronous GameThread blocking
 //     https://dev.epicgames.com/documentation/en-us/unreal-engine/automation-driver-in-unreal-engine
 // ============================================================================
 
-#if 0 // DISABLED - See KNOWN ISSUE documentation above
+// ===== Latent Commands for Threading Tests =====
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FMCPTaskQueue_StartStop,
-	"UnrealClaude.MCP.TaskQueue.StartStop",
+/** Latent command: stop the task queue on a tick boundary */
+DEFINE_LATENT_AUTOMATION_COMMAND_ONE_PARAMETER(
+	FStopTaskQueue, TSharedPtr<FMCPToolRegistry>, Registry);
+
+bool FStopTaskQueue::Update()
+{
+	if (Registry.IsValid())
+	{
+		Registry->StopTaskQueue();
+	}
+	return true;
+}
+
+/** Latent command: start the task queue on a tick boundary */
+DEFINE_LATENT_AUTOMATION_COMMAND_ONE_PARAMETER(
+	FStartTaskQueue, TSharedPtr<FMCPToolRegistry>, Registry);
+
+bool FStartTaskQueue::Update()
+{
+	if (Registry.IsValid())
+	{
+		Registry->StartTaskQueue();
+	}
+	return true;
+}
+
+// ===== Task Queue Start/Stop Latent Test =====
+
+IMPLEMENT_COMPLEX_AUTOMATION_TEST(
+	FMCPTaskQueue_StartStop_Latent,
+	"UnrealClaude.MCP.TaskQueue.StartStopLatent",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FMCPTaskQueue_StartStop::RunTest(const FString& Parameters)
+void FMCPTaskQueue_StartStop_Latent::GetTests(
+	TArray<FString>& OutBeautifiedNames,
+	TArray<FString>& OutTestCommands) const
 {
-	FMCPToolRegistry Registry;
+	OutBeautifiedNames.Add(TEXT("StartStopLifecycle"));
+	OutTestCommands.Add(TEXT(""));
+}
 
-	// Should be safe to call multiple times
-	Registry.StartTaskQueue();
-	Registry.StartTaskQueue(); // Double start should be safe
-	Registry.StopTaskQueue();
-	Registry.StopTaskQueue(); // Double stop should be safe
+bool FMCPTaskQueue_StartStop_Latent::RunTest(const FString& Parameters)
+{
+	TSharedPtr<FMCPToolRegistry> Registry = MakeShared<FMCPToolRegistry>();
 
-	// Should be able to restart
-	Registry.StartTaskQueue();
-	Registry.StopTaskQueue();
+	// Start -> Start (double start safe) -> Stop -> Stop (double stop safe)
+	ADD_LATENT_AUTOMATION_COMMAND(FStartTaskQueue(Registry));
+	ADD_LATENT_AUTOMATION_COMMAND(FStartTaskQueue(Registry));
+	ADD_LATENT_AUTOMATION_COMMAND(FStopTaskQueue(Registry));
+	ADD_LATENT_AUTOMATION_COMMAND(FStopTaskQueue(Registry));
+
+	// Restart cycle
+	ADD_LATENT_AUTOMATION_COMMAND(FStartTaskQueue(Registry));
+	ADD_LATENT_AUTOMATION_COMMAND(FStopTaskQueue(Registry));
 
 	return true;
 }
 
-// ===== Task Submission Tests =====
+// ===== Task Submission Latent Tests =====
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FMCPTaskQueue_SubmitValidTool,
-	"UnrealClaude.MCP.TaskQueue.SubmitValidTool",
+IMPLEMENT_COMPLEX_AUTOMATION_TEST(
+	FMCPTaskQueue_SubmitValidTool_Latent,
+	"UnrealClaude.MCP.TaskQueue.SubmitValidToolLatent",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FMCPTaskQueue_SubmitValidTool::RunTest(const FString& Parameters)
+void FMCPTaskQueue_SubmitValidTool_Latent::GetTests(
+	TArray<FString>& OutBeautifiedNames,
+	TArray<FString>& OutTestCommands) const
 {
-	FMCPToolRegistry Registry;
-	Registry.StartTaskQueue();
-	TSharedPtr<FMCPTaskQueue> Queue = Registry.GetTaskQueue();
+	OutBeautifiedNames.Add(TEXT("SubmitValidTool"));
+	OutTestCommands.Add(TEXT(""));
+}
 
-	// Submit a read-only tool that should succeed quickly
+bool FMCPTaskQueue_SubmitValidTool_Latent::RunTest(
+	const FString& Parameters)
+{
+	TSharedPtr<FMCPToolRegistry> Registry = MakeShared<FMCPToolRegistry>();
+	Registry->StartTaskQueue();
+	TSharedPtr<FMCPTaskQueue> Queue = Registry->GetTaskQueue();
+
 	TSharedPtr<FJsonObject> Params = MakeShared<FJsonObject>();
 	FGuid TaskId = Queue->SubmitTask(TEXT("get_level_actors"), Params);
 
-	TestTrue("Should return valid task ID", TaskId.IsValid());
+	TestTrue(TEXT("Should return valid task ID"), TaskId.IsValid());
 
-	// Check task was added
 	TSharedPtr<FMCPAsyncTask> Task = Queue->GetTask(TaskId);
-	TestNotNull("Task should be retrievable", Task.Get());
-	TestEqual("Tool name should match", Task->ToolName, TEXT("get_level_actors"));
+	TestNotNull(TEXT("Task should be retrievable"), Task.Get());
+	if (Task.IsValid())
+	{
+		TestEqual(TEXT("Tool name should match"),
+			Task->ToolName, TEXT("get_level_actors"));
+	}
 
-	Registry.StopTaskQueue();
+	ADD_LATENT_AUTOMATION_COMMAND(FStopTaskQueue(Registry));
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FMCPTaskQueue_SubmitInvalidTool,
-	"UnrealClaude.MCP.TaskQueue.SubmitInvalidTool",
+IMPLEMENT_COMPLEX_AUTOMATION_TEST(
+	FMCPTaskQueue_SubmitInvalidTool_Latent,
+	"UnrealClaude.MCP.TaskQueue.SubmitInvalidToolLatent",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FMCPTaskQueue_SubmitInvalidTool::RunTest(const FString& Parameters)
+void FMCPTaskQueue_SubmitInvalidTool_Latent::GetTests(
+	TArray<FString>& OutBeautifiedNames,
+	TArray<FString>& OutTestCommands) const
 {
-	FMCPToolRegistry Registry;
-	Registry.StartTaskQueue();
-	TSharedPtr<FMCPTaskQueue> Queue = Registry.GetTaskQueue();
+	OutBeautifiedNames.Add(TEXT("SubmitInvalidTool"));
+	OutTestCommands.Add(TEXT(""));
+}
 
-	// Submit non-existent tool
+bool FMCPTaskQueue_SubmitInvalidTool_Latent::RunTest(
+	const FString& Parameters)
+{
+	TSharedPtr<FMCPToolRegistry> Registry = MakeShared<FMCPToolRegistry>();
+	Registry->StartTaskQueue();
+	TSharedPtr<FMCPTaskQueue> Queue = Registry->GetTaskQueue();
+
 	TSharedPtr<FJsonObject> Params = MakeShared<FJsonObject>();
 	FGuid TaskId = Queue->SubmitTask(TEXT("nonexistent_tool_xyz"), Params);
 
-	TestFalse("Should return invalid task ID for unknown tool", TaskId.IsValid());
+	TestFalse(TEXT("Should return invalid task ID for unknown tool"),
+		TaskId.IsValid());
 
-	Registry.StopTaskQueue();
+	ADD_LATENT_AUTOMATION_COMMAND(FStopTaskQueue(Registry));
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FMCPTaskQueue_SubmitWithTimeout,
-	"UnrealClaude.MCP.TaskQueue.SubmitWithTimeout",
+IMPLEMENT_COMPLEX_AUTOMATION_TEST(
+	FMCPTaskQueue_SubmitWithTimeout_Latent,
+	"UnrealClaude.MCP.TaskQueue.SubmitWithTimeoutLatent",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FMCPTaskQueue_SubmitWithTimeout::RunTest(const FString& Parameters)
+void FMCPTaskQueue_SubmitWithTimeout_Latent::GetTests(
+	TArray<FString>& OutBeautifiedNames,
+	TArray<FString>& OutTestCommands) const
 {
-	FMCPToolRegistry Registry;
-	Registry.StartTaskQueue();
-	TSharedPtr<FMCPTaskQueue> Queue = Registry.GetTaskQueue();
+	OutBeautifiedNames.Add(TEXT("SubmitWithTimeout"));
+	OutTestCommands.Add(TEXT(""));
+}
 
-	// Submit with custom timeout
+bool FMCPTaskQueue_SubmitWithTimeout_Latent::RunTest(
+	const FString& Parameters)
+{
+	TSharedPtr<FMCPToolRegistry> Registry = MakeShared<FMCPToolRegistry>();
+	Registry->StartTaskQueue();
+	TSharedPtr<FMCPTaskQueue> Queue = Registry->GetTaskQueue();
+
 	TSharedPtr<FJsonObject> Params = MakeShared<FJsonObject>();
-	FGuid TaskId = Queue->SubmitTask(TEXT("get_level_actors"), Params, 30000);
+	FGuid TaskId = Queue->SubmitTask(
+		TEXT("get_level_actors"), Params, 30000);
 
-	TestTrue("Should return valid task ID", TaskId.IsValid());
+	TestTrue(TEXT("Should return valid task ID"), TaskId.IsValid());
 
 	TSharedPtr<FMCPAsyncTask> Task = Queue->GetTask(TaskId);
-	TestNotNull("Task should be retrievable", Task.Get());
-	TestEqual("Custom timeout should be set", Task->TimeoutMs, 30000u);
+	TestNotNull(TEXT("Task should be retrievable"), Task.Get());
+	if (Task.IsValid())
+	{
+		TestEqual(TEXT("Custom timeout should be set"),
+			Task->TimeoutMs, 30000u);
+	}
 
-	Registry.StopTaskQueue();
+	ADD_LATENT_AUTOMATION_COMMAND(FStopTaskQueue(Registry));
 	return true;
 }
 
-// ===== Task Status Tests =====
+// ===== Task Status Latent Tests =====
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FMCPTaskQueue_GetTaskStatus,
-	"UnrealClaude.MCP.TaskQueue.GetTaskStatus",
+IMPLEMENT_COMPLEX_AUTOMATION_TEST(
+	FMCPTaskQueue_GetTaskStatus_Latent,
+	"UnrealClaude.MCP.TaskQueue.GetTaskStatusLatent",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FMCPTaskQueue_GetTaskStatus::RunTest(const FString& Parameters)
+void FMCPTaskQueue_GetTaskStatus_Latent::GetTests(
+	TArray<FString>& OutBeautifiedNames,
+	TArray<FString>& OutTestCommands) const
 {
-	FMCPToolRegistry Registry;
-	Registry.StartTaskQueue();
-	TSharedPtr<FMCPTaskQueue> Queue = Registry.GetTaskQueue();
+	OutBeautifiedNames.Add(TEXT("GetTaskStatus"));
+	OutTestCommands.Add(TEXT(""));
+}
+
+bool FMCPTaskQueue_GetTaskStatus_Latent::RunTest(
+	const FString& Parameters)
+{
+	TSharedPtr<FMCPToolRegistry> Registry = MakeShared<FMCPToolRegistry>();
+	Registry->StartTaskQueue();
+	TSharedPtr<FMCPTaskQueue> Queue = Registry->GetTaskQueue();
 
 	TSharedPtr<FJsonObject> Params = MakeShared<FJsonObject>();
 	FGuid TaskId = Queue->SubmitTask(TEXT("get_level_actors"), Params);
 
 	TSharedPtr<FMCPAsyncTask> Task = Queue->GetTask(TaskId);
-	TestNotNull("Task should exist", Task.Get());
+	TestNotNull(TEXT("Task should exist"), Task.Get());
 
-	// Initially should be pending or running
-	EMCPTaskStatus Status = Task->Status.Load();
-	TestTrue("Initial status should be pending or running",
-		Status == EMCPTaskStatus::Pending || Status == EMCPTaskStatus::Running);
+	if (Task.IsValid())
+	{
+		EMCPTaskStatus Status = Task->Status.Load();
+		TestTrue(TEXT("Initial status should be pending or running"),
+			Status == EMCPTaskStatus::Pending
+			|| Status == EMCPTaskStatus::Running);
+		TestTrue(TEXT("SubmittedTime should be set"),
+			Task->SubmittedTime > FDateTime::MinValue());
+	}
 
-	// Submitted time should be set
-	TestTrue("SubmittedTime should be set", Task->SubmittedTime > FDateTime::MinValue());
-
-	Registry.StopTaskQueue();
+	ADD_LATENT_AUTOMATION_COMMAND(FStopTaskQueue(Registry));
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FMCPTaskQueue_GetNonExistentTask,
-	"UnrealClaude.MCP.TaskQueue.GetNonExistentTask",
+IMPLEMENT_COMPLEX_AUTOMATION_TEST(
+	FMCPTaskQueue_GetNonExistentTask_Latent,
+	"UnrealClaude.MCP.TaskQueue.GetNonExistentTaskLatent",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FMCPTaskQueue_GetNonExistentTask::RunTest(const FString& Parameters)
+void FMCPTaskQueue_GetNonExistentTask_Latent::GetTests(
+	TArray<FString>& OutBeautifiedNames,
+	TArray<FString>& OutTestCommands) const
 {
-	FMCPToolRegistry Registry;
-	Registry.StartTaskQueue();
-	TSharedPtr<FMCPTaskQueue> Queue = Registry.GetTaskQueue();
+	OutBeautifiedNames.Add(TEXT("GetNonExistentTask"));
+	OutTestCommands.Add(TEXT(""));
+}
 
-	// Try to get a task that doesn't exist
+bool FMCPTaskQueue_GetNonExistentTask_Latent::RunTest(
+	const FString& Parameters)
+{
+	TSharedPtr<FMCPToolRegistry> Registry = MakeShared<FMCPToolRegistry>();
+	Registry->StartTaskQueue();
+	TSharedPtr<FMCPTaskQueue> Queue = Registry->GetTaskQueue();
+
 	FGuid FakeId = FGuid::NewGuid();
 	TSharedPtr<FMCPAsyncTask> Task = Queue->GetTask(FakeId);
 
-	TestNull("Non-existent task should return nullptr", Task.Get());
+	TestNull(TEXT("Non-existent task should return nullptr"), Task.Get());
 
-	Registry.StopTaskQueue();
+	ADD_LATENT_AUTOMATION_COMMAND(FStopTaskQueue(Registry));
 	return true;
 }
-#endif // DISABLED - Threading tests
 
 // ===== Task Cancellation Tests =====
 
