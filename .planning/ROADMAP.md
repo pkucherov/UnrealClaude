@@ -12,7 +12,7 @@ This roadmap adds OpenCode as a second AI backend to the UnrealClaude editor plu
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Test Baseline** - Establish existing test coverage baseline before any code changes
+- [x] **Phase 1: Test Baseline** - Establish existing test coverage baseline before any code changes
 - [ ] **Phase 2: Backend Abstraction** - Generalize IClaudeRunner into backend-agnostic IChatBackend interface
 - [ ] **Phase 3: SSE Parser & Server Lifecycle** - Build and test the independent OpenCode components (SSE stream parsing, server auto-detect/spawn/shutdown)
 - [ ] **Phase 4: OpenCode Runner & Sessions** - Compose components into FOpenCodeRunner with session management, MCP registration, and full API integration
@@ -46,7 +46,10 @@ Plans:
   2. EBackendType enum exists with Claude and OpenCode values, serializes to/from config, and is usable in settings
   3. ClaudeSubsystem routes chat requests through the abstraction layer and can swap the active backend pointer at runtime without restarting the editor
   4. All existing Claude Code CLI functionality continues working identically after the refactor (no regressions in existing tests from Phase 1)
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 02-01-PLAN.md — Full rename + abstraction: new IChatBackend/ChatBackendTypes, rename 13+ files, refactor subsystem/widgets/runner, update all tests, add ~19 new abstraction tests
 
 ### Phase 3: SSE Parser & Server Lifecycle
 **Goal**: The two most technically complex OpenCode components are built and thoroughly tested in isolation, before any integration with existing code
@@ -93,8 +96,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Test Baseline | 0/5 | Planned | - |
-| 2. Backend Abstraction | 0/TBD | Not started | - |
+| 1. Test Baseline | 5/5 | Complete | 2026-03-31 |
+| 2. Backend Abstraction | 0/1 | Not started | - |
 | 3. SSE Parser & Server Lifecycle | 0/TBD | Not started | - |
 | 4. OpenCode Runner & Sessions | 0/TBD | Not started | - |
 | 5. Chat UI & Backend Switching | 0/TBD | Not started | - |
