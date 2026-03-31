@@ -201,9 +201,9 @@ FString FClaudeCodeRunner::GetClaudePath()
 }
 
 bool FClaudeCodeRunner::ExecuteAsync(
-	const FClaudeRequestConfig& Config,
-	FOnClaudeResponse OnComplete,
-	FOnClaudeProgress OnProgress)
+	const FChatRequestConfig& Config,
+	FOnChatResponse OnComplete,
+	FOnChatProgress OnProgress)
 {
 	// Use atomic compare-exchange for thread-safe check-and-set
 	bool Expected = false;
@@ -228,7 +228,8 @@ bool FClaudeCodeRunner::ExecuteAsync(
 		Thread = nullptr;
 	}
 
-	CurrentConfig = Config;
+	// Store derived config — cast from base to Claude-specific type
+	CurrentConfig = static_cast<const FClaudeRequestConfig&>(Config);
 	OnCompleteDelegate = OnComplete;
 	OnProgressDelegate = OnProgress;
 
@@ -243,7 +244,7 @@ bool FClaudeCodeRunner::ExecuteAsync(
 	return true;
 }
 
-bool FClaudeCodeRunner::ExecuteSync(const FClaudeRequestConfig& Config, FString& OutResponse)
+bool FClaudeCodeRunner::ExecuteSync(const FChatRequestConfig& Config, FString& OutResponse)
 {
 	if (!IsClaudeAvailable())
 	{
@@ -251,8 +252,11 @@ bool FClaudeCodeRunner::ExecuteSync(const FClaudeRequestConfig& Config, FString&
 		return false;
 	}
 
+	// Cast to Claude-specific config for CLI flags
+	const FClaudeRequestConfig& ClaudeConfig = static_cast<const FClaudeRequestConfig&>(Config);
+
 	FString ClaudePath = GetClaudePath();
-	FString CommandLine = BuildCommandLine(Config);
+	FString CommandLine = BuildCommandLine(ClaudeConfig);
 
 	UE_LOG(LogUnrealClaude, Log, TEXT("Executing Claude: %s %s"), *ClaudePath, *CommandLine);
 
@@ -681,11 +685,11 @@ void FClaudeCodeRunner::ParseAndEmitNdjsonLine(const FString& JsonLine)
 
 		if (CurrentConfig.OnStreamEvent.IsBound())
 		{
-			FClaudeStreamEvent Event;
-			Event.Type = EClaudeStreamEventType::SessionInit;
+			FChatStreamEvent Event;
+			Event.Type = EChatStreamEventType::SessionInit;
 			Event.SessionId = SessionId;
 			Event.RawJson = JsonLine;
-			FOnClaudeStreamEvent EventDelegate = CurrentConfig.OnStreamEvent;
+			FOnChatStreamEvent EventDelegate = CurrentConfig.OnStreamEvent;
 			AsyncTask(ENamedThreads::GameThread, [EventDelegate, Event]()
 			{
 				EventDelegate.ExecuteIfBound(Event);
@@ -734,7 +738,7 @@ void FClaudeCodeRunner::ParseAndEmitNdjsonLine(const FString& JsonLine)
 					// Fire old progress delegate for backward compat
 					if (OnProgressDelegate.IsBound())
 					{
-						FOnClaudeProgress ProgressCopy = OnProgressDelegate;
+						FOnChatProgress ProgressCopy = OnProgressDelegate;
 						AsyncTask(ENamedThreads::GameThread, [ProgressCopy, Text]()
 						{
 							ProgressCopy.ExecuteIfBound(Text);
@@ -744,10 +748,10 @@ void FClaudeCodeRunner::ParseAndEmitNdjsonLine(const FString& JsonLine)
 					// Fire new structured event
 					if (CurrentConfig.OnStreamEvent.IsBound())
 					{
-						FClaudeStreamEvent Event;
-						Event.Type = EClaudeStreamEventType::TextContent;
+						FChatStreamEvent Event;
+						Event.Type = EChatStreamEventType::TextContent;
 						Event.Text = Text;
-						FOnClaudeStreamEvent EventDelegate = CurrentConfig.OnStreamEvent;
+						FOnChatStreamEvent EventDelegate = CurrentConfig.OnStreamEvent;
 						AsyncTask(ENamedThreads::GameThread, [EventDelegate, Event]()
 						{
 							EventDelegate.ExecuteIfBound(Event);
@@ -777,13 +781,13 @@ void FClaudeCodeRunner::ParseAndEmitNdjsonLine(const FString& JsonLine)
 
 				if (CurrentConfig.OnStreamEvent.IsBound())
 				{
-					FClaudeStreamEvent Event;
-					Event.Type = EClaudeStreamEventType::ToolUse;
+					FChatStreamEvent Event;
+					Event.Type = EChatStreamEventType::ToolUse;
 					Event.ToolName = ToolName;
 					Event.ToolCallId = ToolId;
 					Event.ToolInput = ToolInputStr;
 					Event.RawJson = JsonLine;
-					FOnClaudeStreamEvent EventDelegate = CurrentConfig.OnStreamEvent;
+					FOnChatStreamEvent EventDelegate = CurrentConfig.OnStreamEvent;
 					AsyncTask(ENamedThreads::GameThread, [EventDelegate, Event]()
 					{
 						EventDelegate.ExecuteIfBound(Event);
@@ -866,12 +870,12 @@ void FClaudeCodeRunner::ParseAndEmitNdjsonLine(const FString& JsonLine)
 
 				if (CurrentConfig.OnStreamEvent.IsBound())
 				{
-					FClaudeStreamEvent Event;
-					Event.Type = EClaudeStreamEventType::ToolResult;
+					FChatStreamEvent Event;
+					Event.Type = EChatStreamEventType::ToolResult;
 					Event.ToolCallId = ToolUseId;
 					Event.ToolResultContent = ResultContent;
 					Event.RawJson = JsonLine;
-					FOnClaudeStreamEvent EventDelegate = CurrentConfig.OnStreamEvent;
+					FOnChatStreamEvent EventDelegate = CurrentConfig.OnStreamEvent;
 					AsyncTask(ENamedThreads::GameThread, [EventDelegate, Event]()
 					{
 						EventDelegate.ExecuteIfBound(Event);
@@ -900,15 +904,15 @@ void FClaudeCodeRunner::ParseAndEmitNdjsonLine(const FString& JsonLine)
 
 		if (CurrentConfig.OnStreamEvent.IsBound())
 		{
-			FClaudeStreamEvent Event;
-			Event.Type = EClaudeStreamEventType::Result;
+			FChatStreamEvent Event;
+			Event.Type = EChatStreamEventType::Result;
 			Event.ResultText = ResultText;
 			Event.bIsError = bIsError;
 			Event.DurationMs = static_cast<int32>(DurationMs);
 			Event.NumTurns = static_cast<int32>(NumTurns);
 			Event.TotalCostUsd = static_cast<float>(TotalCostUsd);
 			Event.RawJson = JsonLine;
-			FOnClaudeStreamEvent EventDelegate = CurrentConfig.OnStreamEvent;
+			FOnChatStreamEvent EventDelegate = CurrentConfig.OnStreamEvent;
 			AsyncTask(ENamedThreads::GameThread, [EventDelegate, Event]()
 			{
 				EventDelegate.ExecuteIfBound(Event);
@@ -1094,7 +1098,7 @@ FString FClaudeCodeRunner::ReadProcessOutput()
 
 void FClaudeCodeRunner::ReportError(const FString& ErrorMessage)
 {
-	FOnClaudeResponse CompleteCopy = OnCompleteDelegate;
+	FOnChatResponse CompleteCopy = OnCompleteDelegate;
 	FString Message = ErrorMessage;
 	AsyncTask(ENamedThreads::GameThread, [CompleteCopy, Message]()
 	{
@@ -1104,7 +1108,7 @@ void FClaudeCodeRunner::ReportError(const FString& ErrorMessage)
 
 void FClaudeCodeRunner::ReportCompletion(const FString& Output, bool bSuccess)
 {
-	FOnClaudeResponse CompleteCopy = OnCompleteDelegate;
+	FOnChatResponse CompleteCopy = OnCompleteDelegate;
 	FString FinalOutput = Output;
 	AsyncTask(ENamedThreads::GameThread, [CompleteCopy, FinalOutput, bSuccess]()
 	{
@@ -1248,4 +1252,40 @@ void FClaudeCodeRunner::ExecuteProcess()
 	ReportCompletion(ResponseText, bSuccess);
 }
 
-// FClaudeCodeSubsystem is now in ClaudeSubsystem.cpp
+// ===== IChatBackend New Methods =====
+
+FString FClaudeCodeRunner::GetDisplayName() const
+{
+	return TEXT("Claude");
+}
+
+EChatBackendType FClaudeCodeRunner::GetBackendType() const
+{
+	return EChatBackendType::Claude;
+}
+
+FString FClaudeCodeRunner::FormatPrompt(
+	const TArray<TPair<FString, FString>>& History,
+	const FString& SystemPrompt,
+	const FString& ProjectContext) const
+{
+	FString FormattedPrompt;
+
+	// Include recent history using Claude's Human:/Assistant: format
+	int32 StartIndex = FMath::Max(0, History.Num() - UnrealClaudeConstants::Session::MaxHistoryInPrompt);
+
+	for (int32 i = StartIndex; i < History.Num(); ++i)
+	{
+		const TPair<FString, FString>& Exchange = History[i];
+		FormattedPrompt += FString::Printf(
+			TEXT("Human: %s\n\nAssistant: %s\n\n"),
+			*Exchange.Key, *Exchange.Value);
+	}
+
+	return FormattedPrompt;
+}
+
+TUniquePtr<FChatRequestConfig> FClaudeCodeRunner::CreateConfig() const
+{
+	return MakeUnique<FClaudeRequestConfig>();
+}

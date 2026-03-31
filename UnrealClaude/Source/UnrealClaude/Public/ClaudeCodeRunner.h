@@ -3,7 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "IClaudeRunner.h"
+#include "IChatBackend.h"
+#include "ClaudeRequestConfig.h"
 #include "HAL/Runnable.h"
 #include "HAL/RunnableThread.h"
 #include "HAL/PlatformProcess.h"
@@ -11,25 +12,34 @@
 /**
  * Async runner for Claude Code CLI commands (cross-platform implementation)
  * Executes 'claude -p' in print mode and captures output
- * Implements IClaudeRunner interface for abstraction
+ * Implements IChatBackend interface for the Claude Code backend
  */
-class UNREALCLAUDE_API FClaudeCodeRunner : public IClaudeRunner, public FRunnable
+class UNREALCLAUDE_API FClaudeCodeRunner : public IChatBackend, public FRunnable
 {
 public:
 	FClaudeCodeRunner();
 	virtual ~FClaudeCodeRunner();
 
-	// IClaudeRunner interface
+	// IChatBackend interface — carried methods
 	virtual bool ExecuteAsync(
-		const FClaudeRequestConfig& Config,
-		FOnClaudeResponse OnComplete,
-		FOnClaudeProgress OnProgress = FOnClaudeProgress()
+		const FChatRequestConfig& Config,
+		FOnChatResponse OnComplete,
+		FOnChatProgress OnProgress = FOnChatProgress()
 	) override;
 
-	virtual bool ExecuteSync(const FClaudeRequestConfig& Config, FString& OutResponse) override;
+	virtual bool ExecuteSync(const FChatRequestConfig& Config, FString& OutResponse) override;
 	virtual void Cancel() override;
 	virtual bool IsExecuting() const override { return bIsExecuting; }
 	virtual bool IsAvailable() const override { return IsClaudeAvailable(); }
+
+	// IChatBackend interface — new methods
+	virtual FString GetDisplayName() const override;
+	virtual EChatBackendType GetBackendType() const override;
+	virtual FString FormatPrompt(
+		const TArray<TPair<FString, FString>>& History,
+		const FString& SystemPrompt,
+		const FString& ProjectContext) const override;
+	virtual TUniquePtr<FChatRequestConfig> CreateConfig() const override;
 
 	/** Check if Claude CLI is available on this system (static for backward compatibility) */
 	static bool IsClaudeAvailable();
@@ -79,8 +89,8 @@ private:
 	void ReportCompletion(const FString& Output, bool bSuccess);
 
 	FClaudeRequestConfig CurrentConfig;
-	FOnClaudeResponse OnCompleteDelegate;
-	FOnClaudeProgress OnProgressDelegate;
+	FOnChatResponse OnCompleteDelegate;
+	FOnChatProgress OnProgressDelegate;
 
 	FRunnableThread* Thread;
 	FThreadSafeCounter StopTaskCounter;
