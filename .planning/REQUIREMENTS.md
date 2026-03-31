@@ -46,7 +46,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Testing (TEST)
 
-- [ ] **TEST-00**: Existing unit test coverage baseline established; coverage increased to ≥90% for pre-existing components where feasible
+- [x] **TEST-00**: Existing unit test coverage baseline established; coverage increased to ≥90% for pre-existing components where feasible
 - [ ] **TEST-01**: All new classes (FOpenCodeRunner, FOpenCodeSSEParser, FOpenCodeServerLifecycle) have ≥90% unit test coverage
 - [ ] **TEST-02**: SSE parser tested against malformed streams, partial chunks, reconnect tokens, and multi-event batches
 - [ ] **TEST-03**: Server lifecycle tested: spawn, health-check, reconnect, graceful shutdown, crash recovery, PID file cleanup
@@ -89,7 +89,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TEST-00 | Phase 1: Test Baseline | Pending |
+| TEST-00 | Phase 1: Test Baseline | Complete |
 | ABST-01 | Phase 2: Backend Abstraction | Pending |
 | ABST-02 | Phase 2: Backend Abstraction | Pending |
 | ABST-03 | Phase 2: Backend Abstraction | Pending |
