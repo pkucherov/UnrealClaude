@@ -1,9 +1,9 @@
 // Copyright Natali Caggiano. All Rights Reserved.
 
 /**
- * Unit tests for FClaudeCodeSubsystem
+ * Unit tests for FChatSubsystem.
  * Tests singleton access, system prompts, history management,
- * session persistence, and FClaudePromptOptions defaults.
+ * session persistence, and FChatPromptOptions defaults.
  * 
  * SAFETY: No tests call SendPrompt (spawns subprocess).
  * ClearHistory test documents state modification.
@@ -11,23 +11,24 @@
 
 #include "CoreMinimal.h"
 #include "Misc/AutomationTest.h"
-#include "ClaudeSubsystem.h"
-#include "IClaudeRunner.h"
+#include "ChatSubsystem.h"
+#include "IChatBackend.h"
+#include "ChatBackendTypes.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
 // ===== Singleton Access Tests =====
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeSubsystem_Singleton_GetReturnsSameInstance,
-	"UnrealClaude.ClaudeSubsystem.Singleton.GetReturnsSameInstance",
+	FChatSubsystem_Singleton_GetReturnsSameInstance,
+	"UnrealClaude.ChatSubsystem.Singleton.GetReturnsSameInstance",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeSubsystem_Singleton_GetReturnsSameInstance::RunTest(const FString& Parameters)
+bool FChatSubsystem_Singleton_GetReturnsSameInstance::RunTest(const FString& Parameters)
 {
-	FClaudeCodeSubsystem& Instance1 = FClaudeCodeSubsystem::Get();
-	FClaudeCodeSubsystem& Instance2 = FClaudeCodeSubsystem::Get();
+	FChatSubsystem& Instance1 = FChatSubsystem::Get();
+	FChatSubsystem& Instance2 = FChatSubsystem::Get();
 
 	TestEqual("Get() should return same address on repeated calls",
 		&Instance1, &Instance2);
@@ -36,17 +37,17 @@ bool FClaudeSubsystem_Singleton_GetReturnsSameInstance::RunTest(const FString& P
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeSubsystem_Singleton_GetRunnerNotNull,
-	"UnrealClaude.ClaudeSubsystem.Singleton.GetRunnerNotNull",
+	FChatSubsystem_Singleton_GetBackendNotNull,
+	"UnrealClaude.ChatSubsystem.Singleton.GetBackendNotNull",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeSubsystem_Singleton_GetRunnerNotNull::RunTest(const FString& Parameters)
+bool FChatSubsystem_Singleton_GetBackendNotNull::RunTest(const FString& Parameters)
 {
-	FClaudeCodeSubsystem& Subsystem = FClaudeCodeSubsystem::Get();
-	IClaudeRunner* Runner = Subsystem.GetRunner();
+	FChatSubsystem& Subsystem = FChatSubsystem::Get();
+	IChatBackend* Backend = Subsystem.GetBackend();
 
-	TestNotNull("GetRunner() should return a valid runner pointer", Runner);
+	TestNotNull("GetBackend() should return a valid backend pointer", Backend);
 
 	return true;
 }
@@ -54,14 +55,14 @@ bool FClaudeSubsystem_Singleton_GetRunnerNotNull::RunTest(const FString& Paramet
 // ===== System Prompt Tests =====
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeSubsystem_Prompt_UE57SystemPromptNotEmpty,
-	"UnrealClaude.ClaudeSubsystem.Prompt.UE57SystemPromptNotEmpty",
+	FChatSubsystem_Prompt_UE57SystemPromptNotEmpty,
+	"UnrealClaude.ChatSubsystem.Prompt.UE57SystemPromptNotEmpty",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeSubsystem_Prompt_UE57SystemPromptNotEmpty::RunTest(const FString& Parameters)
+bool FChatSubsystem_Prompt_UE57SystemPromptNotEmpty::RunTest(const FString& Parameters)
 {
-	FClaudeCodeSubsystem& Subsystem = FClaudeCodeSubsystem::Get();
+	FChatSubsystem& Subsystem = FChatSubsystem::Get();
 	FString SystemPrompt = Subsystem.GetUE57SystemPrompt();
 
 	TestTrue("System prompt should not be empty", !SystemPrompt.IsEmpty());
@@ -74,14 +75,14 @@ bool FClaudeSubsystem_Prompt_UE57SystemPromptNotEmpty::RunTest(const FString& Pa
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeSubsystem_Prompt_ProjectContextNoCrash,
-	"UnrealClaude.ClaudeSubsystem.Prompt.ProjectContextNoCrash",
+	FChatSubsystem_Prompt_ProjectContextNoCrash,
+	"UnrealClaude.ChatSubsystem.Prompt.ProjectContextNoCrash",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeSubsystem_Prompt_ProjectContextNoCrash::RunTest(const FString& Parameters)
+bool FChatSubsystem_Prompt_ProjectContextNoCrash::RunTest(const FString& Parameters)
 {
-	FClaudeCodeSubsystem& Subsystem = FClaudeCodeSubsystem::Get();
+	FChatSubsystem& Subsystem = FChatSubsystem::Get();
 
 	// Project context may be empty if context hasn't been gathered yet.
 	// The important thing is that this call doesn't crash.
@@ -95,14 +96,14 @@ bool FClaudeSubsystem_Prompt_ProjectContextNoCrash::RunTest(const FString& Param
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeSubsystem_Prompt_SetCustomNoCrash,
-	"UnrealClaude.ClaudeSubsystem.Prompt.SetCustomNoCrash",
+	FChatSubsystem_Prompt_SetCustomNoCrash,
+	"UnrealClaude.ChatSubsystem.Prompt.SetCustomNoCrash",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeSubsystem_Prompt_SetCustomNoCrash::RunTest(const FString& Parameters)
+bool FChatSubsystem_Prompt_SetCustomNoCrash::RunTest(const FString& Parameters)
 {
-	FClaudeCodeSubsystem& Subsystem = FClaudeCodeSubsystem::Get();
+	FChatSubsystem& Subsystem = FChatSubsystem::Get();
 
 	// SetCustomSystemPrompt modifies private state that isn't directly observable.
 	// We only verify it doesn't crash when called with various inputs.
@@ -121,14 +122,14 @@ bool FClaudeSubsystem_Prompt_SetCustomNoCrash::RunTest(const FString& Parameters
 // ===== History Tests =====
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeSubsystem_History_GetHistoryReturnsValidArray,
-	"UnrealClaude.ClaudeSubsystem.History.GetHistoryReturnsValidArray",
+	FChatSubsystem_History_GetHistoryReturnsValidArray,
+	"UnrealClaude.ChatSubsystem.History.GetHistoryReturnsValidArray",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeSubsystem_History_GetHistoryReturnsValidArray::RunTest(const FString& Parameters)
+bool FChatSubsystem_History_GetHistoryReturnsValidArray::RunTest(const FString& Parameters)
 {
-	FClaudeCodeSubsystem& Subsystem = FClaudeCodeSubsystem::Get();
+	FChatSubsystem& Subsystem = FChatSubsystem::Get();
 	const TArray<TPair<FString, FString>>& History = Subsystem.GetHistory();
 
 	TestTrue("GetHistory() should return array with non-negative count",
@@ -138,14 +139,14 @@ bool FClaudeSubsystem_History_GetHistoryReturnsValidArray::RunTest(const FString
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeSubsystem_History_ClearHistoryResetsToEmpty,
-	"UnrealClaude.ClaudeSubsystem.History.ClearHistoryResetsToEmpty",
+	FChatSubsystem_History_ClearHistoryResetsToEmpty,
+	"UnrealClaude.ChatSubsystem.History.ClearHistoryResetsToEmpty",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeSubsystem_History_ClearHistoryResetsToEmpty::RunTest(const FString& Parameters)
+bool FChatSubsystem_History_ClearHistoryResetsToEmpty::RunTest(const FString& Parameters)
 {
-	FClaudeCodeSubsystem& Subsystem = FClaudeCodeSubsystem::Get();
+	FChatSubsystem& Subsystem = FChatSubsystem::Get();
 
 	// Save the current history count before modification
 	int32 OriginalCount = Subsystem.GetHistory().Num();
@@ -168,14 +169,14 @@ bool FClaudeSubsystem_History_ClearHistoryResetsToEmpty::RunTest(const FString& 
 // ===== Session Tests =====
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeSubsystem_Session_FilePathNotEmpty,
-	"UnrealClaude.ClaudeSubsystem.Session.FilePathNotEmpty",
+	FChatSubsystem_Session_FilePathNotEmpty,
+	"UnrealClaude.ChatSubsystem.Session.FilePathNotEmpty",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeSubsystem_Session_FilePathNotEmpty::RunTest(const FString& Parameters)
+bool FChatSubsystem_Session_FilePathNotEmpty::RunTest(const FString& Parameters)
 {
-	FClaudeCodeSubsystem& Subsystem = FClaudeCodeSubsystem::Get();
+	FChatSubsystem& Subsystem = FChatSubsystem::Get();
 	FString SessionPath = Subsystem.GetSessionFilePath();
 
 	TestTrue("Session file path should not be empty", !SessionPath.IsEmpty());
@@ -186,14 +187,14 @@ bool FClaudeSubsystem_Session_FilePathNotEmpty::RunTest(const FString& Parameter
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeSubsystem_Session_HasSavedSessionNoCrash,
-	"UnrealClaude.ClaudeSubsystem.Session.HasSavedSessionNoCrash",
+	FChatSubsystem_Session_HasSavedSessionNoCrash,
+	"UnrealClaude.ChatSubsystem.Session.HasSavedSessionNoCrash",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeSubsystem_Session_HasSavedSessionNoCrash::RunTest(const FString& Parameters)
+bool FChatSubsystem_Session_HasSavedSessionNoCrash::RunTest(const FString& Parameters)
 {
-	FClaudeCodeSubsystem& Subsystem = FClaudeCodeSubsystem::Get();
+	FChatSubsystem& Subsystem = FChatSubsystem::Get();
 
 	// HasSavedSession depends on filesystem state — we just verify no crash
 	bool bHasSession = Subsystem.HasSavedSession();
@@ -207,14 +208,14 @@ bool FClaudeSubsystem_Session_HasSavedSessionNoCrash::RunTest(const FString& Par
 // ===== Safety Tests =====
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeSubsystem_Safety_CancelWhenIdleNoCrash,
-	"UnrealClaude.ClaudeSubsystem.Safety.CancelWhenIdleNoCrash",
+	FChatSubsystem_Safety_CancelWhenIdleNoCrash,
+	"UnrealClaude.ChatSubsystem.Safety.CancelWhenIdleNoCrash",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeSubsystem_Safety_CancelWhenIdleNoCrash::RunTest(const FString& Parameters)
+bool FChatSubsystem_Safety_CancelWhenIdleNoCrash::RunTest(const FString& Parameters)
 {
-	FClaudeCodeSubsystem& Subsystem = FClaudeCodeSubsystem::Get();
+	FChatSubsystem& Subsystem = FChatSubsystem::Get();
 
 	// CancelCurrentRequest when nothing is running should be safe
 	Subsystem.CancelCurrentRequest();
@@ -227,14 +228,14 @@ bool FClaudeSubsystem_Safety_CancelWhenIdleNoCrash::RunTest(const FString& Param
 // ===== Regression Guards =====
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeSubsystem_Regression_PromptOptionsDefaults,
-	"UnrealClaude.ClaudeSubsystem.Regression.PromptOptionsDefaults",
+	FChatSubsystem_Regression_PromptOptionsDefaults,
+	"UnrealClaude.ChatSubsystem.Regression.PromptOptionsDefaults",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeSubsystem_Regression_PromptOptionsDefaults::RunTest(const FString& Parameters)
+bool FChatSubsystem_Regression_PromptOptionsDefaults::RunTest(const FString& Parameters)
 {
-	FClaudePromptOptions Options;
+	FChatPromptOptions Options;
 
 	TestTrue("bIncludeEngineContext should default to true",
 		Options.bIncludeEngineContext);

@@ -14,8 +14,10 @@
 #include "ClipboardImageUtils.h"
 #include "ClaudeCodeRunner.h"
 #include "UnrealClaudeConstants.h"
-#include "IClaudeRunner.h"
-#include "ClaudeSubsystem.h"
+#include "IChatBackend.h"
+#include "ChatBackendTypes.h"
+#include "ChatSubsystem.h"
+#include "ClaudeRequestConfig.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "Dom/JsonObject.h"
@@ -193,7 +195,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FClipboardImage_PromptOptions_HasAttachedImagePaths::RunTest(const FString& Parameters)
 {
-	FClaudePromptOptions Options;
+	FChatPromptOptions Options;
 
 	// Default should be empty array
 	TestEqual("AttachedImagePaths should default to empty array", Options.AttachedImagePaths.Num(), 0);
@@ -217,7 +219,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FClipboardImage_PromptOptions_ConvenienceConstructor::RunTest(const FString& Parameters)
 {
-	FClaudePromptOptions Options(true, false);
+	FChatPromptOptions Options(true, false);
 
 	TestTrue("bIncludeEngineContext should be true", Options.bIncludeEngineContext);
 	TestFalse("bIncludeProjectContext should be false", Options.bIncludeProjectContext);
@@ -964,13 +966,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FClipboardImage_MultiImage_PromptOptionsArrayCopied::RunTest(const FString& Parameters)
 {
-	FClaudePromptOptions Original;
+	FChatPromptOptions Original;
 	Original.AttachedImagePaths.Add(TEXT("img1.png"));
 	Original.AttachedImagePaths.Add(TEXT("img2.png"));
 	Original.AttachedImagePaths.Add(TEXT("img3.png"));
 
 	// Copy
-	FClaudePromptOptions Copy = Original;
+	FChatPromptOptions Copy = Original;
 	TestEqual("Copied options should have 3 paths", Copy.AttachedImagePaths.Num(), 3);
 	TestEqual("First path should match", Copy.AttachedImagePaths[0], TEXT("img1.png"));
 	TestEqual("Second path should match", Copy.AttachedImagePaths[1], TEXT("img2.png"));

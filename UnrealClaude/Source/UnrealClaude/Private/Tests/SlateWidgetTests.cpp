@@ -1,7 +1,7 @@
 // Copyright Natali Caggiano. All Rights Reserved.
 
 /**
- * Automation tests for Slate UI widgets: SClaudeInputArea, SClaudeToolbar, SClaudeEditorWidget.
+ * Automation tests for Slate UI widgets: SChatInputArea, SChatToolbar, SChatEditorWidget.
  * Tests widget construction via SAssignNew and public API methods.
  * All tests guarded by FSlateApplication::IsInitialized() check.
  *
@@ -11,9 +11,9 @@
 
 #include "CoreMinimal.h"
 #include "Misc/AutomationTest.h"
-#include "Widgets/SClaudeInputArea.h"
-#include "Widgets/SClaudeToolbar.h"
-#include "ClaudeEditorWidget.h"
+#include "Widgets/SChatInputArea.h"
+#include "Widgets/SChatToolbar.h"
+#include "ChatEditorWidget.h"
 #include "Framework/Application/SlateApplication.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -34,8 +34,8 @@ bool FSlateWidget_InputArea_Construction::RunTest(const FString& Parameters)
 		return true;
 	}
 
-	TSharedPtr<SClaudeInputArea> InputArea;
-	SAssignNew(InputArea, SClaudeInputArea)
+	TSharedPtr<SChatInputArea> InputArea;
+	SAssignNew(InputArea, SChatInputArea)
 		.bIsWaiting(false);
 
 	TestNotNull(TEXT("InputArea should construct via SAssignNew"),
@@ -60,8 +60,8 @@ bool FSlateWidget_InputArea_SetGetTextRoundTrip::RunTest(const FString& Paramete
 		return true;
 	}
 
-	TSharedPtr<SClaudeInputArea> InputArea;
-	SAssignNew(InputArea, SClaudeInputArea)
+	TSharedPtr<SChatInputArea> InputArea;
+	SAssignNew(InputArea, SChatInputArea)
 		.bIsWaiting(false);
 	TestNotNull(TEXT("InputArea should construct"), InputArea.Get());
 	if (!InputArea.IsValid()) { return false; }
@@ -89,8 +89,8 @@ bool FSlateWidget_InputArea_ClearText::RunTest(const FString& Parameters)
 		return true;
 	}
 
-	TSharedPtr<SClaudeInputArea> InputArea;
-	SAssignNew(InputArea, SClaudeInputArea)
+	TSharedPtr<SChatInputArea> InputArea;
+	SAssignNew(InputArea, SChatInputArea)
 		.bIsWaiting(false);
 	TestNotNull(TEXT("InputArea should construct"), InputArea.Get());
 	if (!InputArea.IsValid()) { return false; }
@@ -122,8 +122,8 @@ bool FSlateWidget_InputArea_HasAttachedImagesFresh::RunTest(
 		return true;
 	}
 
-	TSharedPtr<SClaudeInputArea> InputArea;
-	SAssignNew(InputArea, SClaudeInputArea)
+	TSharedPtr<SChatInputArea> InputArea;
+	SAssignNew(InputArea, SChatInputArea)
 		.bIsWaiting(false);
 	TestNotNull(TEXT("InputArea should construct"), InputArea.Get());
 	if (!InputArea.IsValid()) { return false; }
@@ -149,8 +149,8 @@ bool FSlateWidget_InputArea_GetAttachedImageCountFresh::RunTest(
 		return true;
 	}
 
-	TSharedPtr<SClaudeInputArea> InputArea;
-	SAssignNew(InputArea, SClaudeInputArea)
+	TSharedPtr<SChatInputArea> InputArea;
+	SAssignNew(InputArea, SChatInputArea)
 		.bIsWaiting(false);
 	TestNotNull(TEXT("InputArea should construct"), InputArea.Get());
 	if (!InputArea.IsValid()) { return false; }
@@ -176,8 +176,8 @@ bool FSlateWidget_InputArea_GetAttachedImagePathsFresh::RunTest(
 		return true;
 	}
 
-	TSharedPtr<SClaudeInputArea> InputArea;
-	SAssignNew(InputArea, SClaudeInputArea)
+	TSharedPtr<SChatInputArea> InputArea;
+	SAssignNew(InputArea, SChatInputArea)
 		.bIsWaiting(false);
 	TestNotNull(TEXT("InputArea should construct"), InputArea.Get());
 	if (!InputArea.IsValid()) { return false; }
@@ -205,8 +205,8 @@ bool FSlateWidget_InputArea_ClearAttachedImagesFresh::RunTest(
 		return true;
 	}
 
-	TSharedPtr<SClaudeInputArea> InputArea;
-	SAssignNew(InputArea, SClaudeInputArea)
+	TSharedPtr<SChatInputArea> InputArea;
+	SAssignNew(InputArea, SChatInputArea)
 		.bIsWaiting(false);
 	TestNotNull(TEXT("InputArea should construct"), InputArea.Get());
 	if (!InputArea.IsValid()) { return false; }
@@ -235,8 +235,8 @@ bool FSlateWidget_InputArea_RemoveAttachedImageInvalidIndex::RunTest(
 		return true;
 	}
 
-	TSharedPtr<SClaudeInputArea> InputArea;
-	SAssignNew(InputArea, SClaudeInputArea)
+	TSharedPtr<SChatInputArea> InputArea;
+	SAssignNew(InputArea, SChatInputArea)
 		.bIsWaiting(false);
 	TestNotNull(TEXT("InputArea should construct"), InputArea.Get());
 	if (!InputArea.IsValid()) { return false; }
@@ -270,8 +270,8 @@ bool FSlateWidget_InputArea_OnSendCallbackBinding::RunTest(
 	}
 
 	bool bSendFired = false;
-	TSharedPtr<SClaudeInputArea> InputArea;
-	SAssignNew(InputArea, SClaudeInputArea)
+	TSharedPtr<SChatInputArea> InputArea;
+	SAssignNew(InputArea, SChatInputArea)
 		.bIsWaiting(false)
 		.OnSend(FOnInputAction::CreateLambda([&bSendFired]()
 		{
@@ -306,8 +306,8 @@ bool FSlateWidget_Toolbar_ConstructionDefaults::RunTest(
 		return true;
 	}
 
-	TSharedPtr<SClaudeToolbar> Toolbar;
-	SAssignNew(Toolbar, SClaudeToolbar);
+	TSharedPtr<SChatToolbar> Toolbar;
+	SAssignNew(Toolbar, SChatToolbar);
 
 	TestNotNull(TEXT("Toolbar should construct with default arguments"),
 		Toolbar.Get());
@@ -330,8 +330,8 @@ bool FSlateWidget_Toolbar_ConstructionCustomAttributes::RunTest(
 		return true;
 	}
 
-	TSharedPtr<SClaudeToolbar> Toolbar;
-	SAssignNew(Toolbar, SClaudeToolbar)
+	TSharedPtr<SChatToolbar> Toolbar;
+	SAssignNew(Toolbar, SChatToolbar)
 		.bUE57ContextEnabled(false)
 		.bProjectContextEnabled(false)
 		.bRestoreEnabled(true);
@@ -361,8 +361,8 @@ bool FSlateWidget_Toolbar_OnNewSessionCallbackBinding::RunTest(
 	}
 
 	bool bCallbackFired = false;
-	TSharedPtr<SClaudeToolbar> Toolbar;
-	SAssignNew(Toolbar, SClaudeToolbar)
+	TSharedPtr<SChatToolbar> Toolbar;
+	SAssignNew(Toolbar, SChatToolbar)
 		.bUE57ContextEnabled(true)
 		.bProjectContextEnabled(true)
 		.bRestoreEnabled(false)
@@ -399,16 +399,16 @@ bool FSlateWidget_EditorWidget_Construction::RunTest(
 		return true;
 	}
 
-	// SClaudeEditorWidget::Construct() accesses FClaudeCodeSubsystem
+	// SChatEditorWidget::Construct() accesses FChatSubsystem
 	// singleton, starts MCP server checks, and performs other editor
 	// subsystem initialization. This may or may not succeed in the
 	// automation test context depending on module load state.
 	// We attempt construction and report the outcome.
 
-	TSharedPtr<SClaudeEditorWidget> EditorWidget;
+	TSharedPtr<SChatEditorWidget> EditorWidget;
 
 	// Attempt construction — may access subsystems not available in test
-	SAssignNew(EditorWidget, SClaudeEditorWidget);
+	SAssignNew(EditorWidget, SChatEditorWidget);
 
 	if (EditorWidget.IsValid())
 	{
@@ -418,7 +418,7 @@ bool FSlateWidget_EditorWidget_Construction::RunTest(
 	}
 	else
 	{
-		AddWarning(TEXT("SClaudeEditorWidget construction returned "
+		AddWarning(TEXT("SChatEditorWidget construction returned "
 			"invalid pointer — subsystem dependencies may not be "
 			"available in test context"));
 	}

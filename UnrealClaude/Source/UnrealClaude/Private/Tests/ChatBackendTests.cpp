@@ -2,14 +2,16 @@
 
 /** Unit tests for FClaudeCodeRunner and related structs.
  * Tests NDJSON stream parsing, payload construction, struct defaults,
- * static methods, and IClaudeRunner interface contract.
+ * static methods, and IChatBackend interface contract.
  * SAFETY: No tests call ExecuteAsync or ExecuteSync. Only safe helpers tested.
  */
 
 #include "CoreMinimal.h"
 #include "Misc/AutomationTest.h"
 #include "ClaudeCodeRunner.h"
-#include "IClaudeRunner.h"
+#include "IChatBackend.h"
+#include "ChatBackendTypes.h"
+#include "ClaudeRequestConfig.h"
 #include "Tests/TestUtils.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
@@ -20,17 +22,17 @@
 // ===== Stream Event Struct Tests =====
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeRunner_StreamEvent_DefaultValues,
-	"UnrealClaude.ClaudeRunner.StreamEvent.DefaultValues",
+	FChatBackend_StreamEvent_DefaultValues,
+	"UnrealClaude.ChatBackend.StreamEvent.DefaultValues",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeRunner_StreamEvent_DefaultValues::RunTest(const FString& Parameters)
+bool FChatBackend_StreamEvent_DefaultValues::RunTest(const FString& Parameters)
 {
-	FClaudeStreamEvent Event;
+	FChatStreamEvent Event;
 
 	TestEqual("Default Type should be Unknown",
-		Event.Type, EClaudeStreamEventType::Unknown);
+		Event.Type, EChatStreamEventType::Unknown);
 	TestTrue("Default Text should be empty", Event.Text.IsEmpty());
 	TestTrue("Default ToolName should be empty", Event.ToolName.IsEmpty());
 	TestTrue("Default ToolInput should be empty", Event.ToolInput.IsEmpty());
@@ -50,43 +52,43 @@ bool FClaudeRunner_StreamEvent_DefaultValues::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeRunner_StreamEvent_AllEnumValues,
-	"UnrealClaude.ClaudeRunner.StreamEvent.AllEnumValues",
+	FChatBackend_StreamEvent_AllEnumValues,
+	"UnrealClaude.ChatBackend.StreamEvent.AllEnumValues",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeRunner_StreamEvent_AllEnumValues::RunTest(const FString& Parameters)
+bool FChatBackend_StreamEvent_AllEnumValues::RunTest(const FString& Parameters)
 {
 	// Verify all 7 enum values can be assigned and compared
-	FClaudeStreamEvent Event;
+	FChatStreamEvent Event;
 
-	Event.Type = EClaudeStreamEventType::SessionInit;
+	Event.Type = EChatStreamEventType::SessionInit;
 	TestEqual("SessionInit assignment",
-		Event.Type, EClaudeStreamEventType::SessionInit);
+		Event.Type, EChatStreamEventType::SessionInit);
 
-	Event.Type = EClaudeStreamEventType::TextContent;
+	Event.Type = EChatStreamEventType::TextContent;
 	TestEqual("TextContent assignment",
-		Event.Type, EClaudeStreamEventType::TextContent);
+		Event.Type, EChatStreamEventType::TextContent);
 
-	Event.Type = EClaudeStreamEventType::ToolUse;
+	Event.Type = EChatStreamEventType::ToolUse;
 	TestEqual("ToolUse assignment",
-		Event.Type, EClaudeStreamEventType::ToolUse);
+		Event.Type, EChatStreamEventType::ToolUse);
 
-	Event.Type = EClaudeStreamEventType::ToolResult;
+	Event.Type = EChatStreamEventType::ToolResult;
 	TestEqual("ToolResult assignment",
-		Event.Type, EClaudeStreamEventType::ToolResult);
+		Event.Type, EChatStreamEventType::ToolResult);
 
-	Event.Type = EClaudeStreamEventType::Result;
+	Event.Type = EChatStreamEventType::Result;
 	TestEqual("Result assignment",
-		Event.Type, EClaudeStreamEventType::Result);
+		Event.Type, EChatStreamEventType::Result);
 
-	Event.Type = EClaudeStreamEventType::AssistantMessage;
+	Event.Type = EChatStreamEventType::AssistantMessage;
 	TestEqual("AssistantMessage assignment",
-		Event.Type, EClaudeStreamEventType::AssistantMessage);
+		Event.Type, EChatStreamEventType::AssistantMessage);
 
-	Event.Type = EClaudeStreamEventType::Unknown;
+	Event.Type = EChatStreamEventType::Unknown;
 	TestEqual("Unknown assignment",
-		Event.Type, EClaudeStreamEventType::Unknown);
+		Event.Type, EChatStreamEventType::Unknown);
 
 	return true;
 }
@@ -94,12 +96,12 @@ bool FClaudeRunner_StreamEvent_AllEnumValues::RunTest(const FString& Parameters)
 // ===== Request Config Tests =====
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeRunner_RequestConfig_DefaultValues,
-	"UnrealClaude.ClaudeRunner.RequestConfig.DefaultValues",
+	FChatBackend_RequestConfig_DefaultValues,
+	"UnrealClaude.ChatBackend.RequestConfig.DefaultValues",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeRunner_RequestConfig_DefaultValues::RunTest(const FString& Parameters)
+bool FChatBackend_RequestConfig_DefaultValues::RunTest(const FString& Parameters)
 {
 	FClaudeRequestConfig Config;
 
@@ -125,12 +127,12 @@ bool FClaudeRunner_RequestConfig_DefaultValues::RunTest(const FString& Parameter
 // ===== NDJSON Parsing Tests =====
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeRunner_Parse_EmptyInput,
-	"UnrealClaude.ClaudeRunner.Parse.EmptyInput",
+	FChatBackend_Parse_EmptyInput,
+	"UnrealClaude.ChatBackend.Parse.EmptyInput",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeRunner_Parse_EmptyInput::RunTest(const FString& Parameters)
+bool FChatBackend_Parse_EmptyInput::RunTest(const FString& Parameters)
 {
 	FClaudeCodeRunner Runner;
 	FString Result = Runner.ParseStreamJsonOutput(TEXT(""));
@@ -143,12 +145,12 @@ bool FClaudeRunner_Parse_EmptyInput::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeRunner_Parse_ValidResultMessage,
-	"UnrealClaude.ClaudeRunner.Parse.ValidResultMessage",
+	FChatBackend_Parse_ValidResultMessage,
+	"UnrealClaude.ChatBackend.Parse.ValidResultMessage",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeRunner_Parse_ValidResultMessage::RunTest(const FString& Parameters)
+bool FChatBackend_Parse_ValidResultMessage::RunTest(const FString& Parameters)
 {
 	FClaudeCodeRunner Runner;
 
@@ -164,12 +166,12 @@ bool FClaudeRunner_Parse_ValidResultMessage::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeRunner_Parse_ValidAssistantMessage,
-	"UnrealClaude.ClaudeRunner.Parse.ValidAssistantMessage",
+	FChatBackend_Parse_ValidAssistantMessage,
+	"UnrealClaude.ChatBackend.Parse.ValidAssistantMessage",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeRunner_Parse_ValidAssistantMessage::RunTest(const FString& Parameters)
+bool FChatBackend_Parse_ValidAssistantMessage::RunTest(const FString& Parameters)
 {
 	FClaudeCodeRunner Runner;
 
@@ -185,12 +187,12 @@ bool FClaudeRunner_Parse_ValidAssistantMessage::RunTest(const FString& Parameter
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeRunner_Parse_MalformedJson,
-	"UnrealClaude.ClaudeRunner.Parse.MalformedJson",
+	FChatBackend_Parse_MalformedJson,
+	"UnrealClaude.ChatBackend.Parse.MalformedJson",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeRunner_Parse_MalformedJson::RunTest(const FString& Parameters)
+bool FChatBackend_Parse_MalformedJson::RunTest(const FString& Parameters)
 {
 	FClaudeCodeRunner Runner;
 
@@ -205,12 +207,12 @@ bool FClaudeRunner_Parse_MalformedJson::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeRunner_Parse_MultipleNdjsonLines,
-	"UnrealClaude.ClaudeRunner.Parse.MultipleNdjsonLines",
+	FChatBackend_Parse_MultipleNdjsonLines,
+	"UnrealClaude.ChatBackend.Parse.MultipleNdjsonLines",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeRunner_Parse_MultipleNdjsonLines::RunTest(const FString& Parameters)
+bool FChatBackend_Parse_MultipleNdjsonLines::RunTest(const FString& Parameters)
 {
 	FClaudeCodeRunner Runner;
 
@@ -230,12 +232,12 @@ bool FClaudeRunner_Parse_MultipleNdjsonLines::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeRunner_Parse_AssistantFallbackMultipleBlocks,
-	"UnrealClaude.ClaudeRunner.Parse.AssistantFallbackMultipleBlocks",
+	FChatBackend_Parse_AssistantFallbackMultipleBlocks,
+	"UnrealClaude.ChatBackend.Parse.AssistantFallbackMultipleBlocks",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeRunner_Parse_AssistantFallbackMultipleBlocks::RunTest(const FString& Parameters)
+bool FChatBackend_Parse_AssistantFallbackMultipleBlocks::RunTest(const FString& Parameters)
 {
 	FClaudeCodeRunner Runner;
 
@@ -253,12 +255,12 @@ bool FClaudeRunner_Parse_AssistantFallbackMultipleBlocks::RunTest(const FString&
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeRunner_Parse_MixedValidAndInvalidLines,
-	"UnrealClaude.ClaudeRunner.Parse.MixedValidAndInvalidLines",
+	FChatBackend_Parse_MixedValidAndInvalidLines,
+	"UnrealClaude.ChatBackend.Parse.MixedValidAndInvalidLines",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeRunner_Parse_MixedValidAndInvalidLines::RunTest(const FString& Parameters)
+bool FChatBackend_Parse_MixedValidAndInvalidLines::RunTest(const FString& Parameters)
 {
 	FClaudeCodeRunner Runner;
 
@@ -279,12 +281,12 @@ bool FClaudeRunner_Parse_MixedValidAndInvalidLines::RunTest(const FString& Param
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeRunner_Parse_ToolUseLineIgnored,
-	"UnrealClaude.ClaudeRunner.Parse.ToolUseLineIgnored",
+	FChatBackend_Parse_ToolUseLineIgnored,
+	"UnrealClaude.ChatBackend.Parse.ToolUseLineIgnored",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeRunner_Parse_ToolUseLineIgnored::RunTest(const FString& Parameters)
+bool FChatBackend_Parse_ToolUseLineIgnored::RunTest(const FString& Parameters)
 {
 	FClaudeCodeRunner Runner;
 
@@ -304,12 +306,12 @@ bool FClaudeRunner_Parse_ToolUseLineIgnored::RunTest(const FString& Parameters)
 // ===== Payload Construction Tests =====
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeRunner_Payload_TextOnly,
-	"UnrealClaude.ClaudeRunner.Payload.TextOnly",
+	FChatBackend_Payload_TextOnly,
+	"UnrealClaude.ChatBackend.Payload.TextOnly",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeRunner_Payload_TextOnly::RunTest(const FString& Parameters)
+bool FChatBackend_Payload_TextOnly::RunTest(const FString& Parameters)
 {
 	FClaudeCodeRunner Runner;
 	TArray<FString> EmptyImages;
@@ -370,12 +372,12 @@ bool FClaudeRunner_Payload_TextOnly::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeRunner_Payload_EmptyPrompt,
-	"UnrealClaude.ClaudeRunner.Payload.EmptyPrompt",
+	FChatBackend_Payload_EmptyPrompt,
+	"UnrealClaude.ChatBackend.Payload.EmptyPrompt",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeRunner_Payload_EmptyPrompt::RunTest(const FString& Parameters)
+bool FChatBackend_Payload_EmptyPrompt::RunTest(const FString& Parameters)
 {
 	FClaudeCodeRunner Runner;
 	TArray<FString> EmptyImages;
@@ -394,12 +396,12 @@ bool FClaudeRunner_Payload_EmptyPrompt::RunTest(const FString& Parameters)
 // ===== Static Method Tests =====
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeRunner_Static_IsClaudeAvailableNoCrash,
-	"UnrealClaude.ClaudeRunner.Static.IsClaudeAvailableNoCrash",
+	FChatBackend_Static_IsClaudeAvailableNoCrash,
+	"UnrealClaude.ChatBackend.Static.IsClaudeAvailableNoCrash",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeRunner_Static_IsClaudeAvailableNoCrash::RunTest(const FString& Parameters)
+bool FChatBackend_Static_IsClaudeAvailableNoCrash::RunTest(const FString& Parameters)
 {
 	// Don't assert the result — Claude CLI may or may not be installed.
 	// Just verify the call doesn't crash.
@@ -412,12 +414,12 @@ bool FClaudeRunner_Static_IsClaudeAvailableNoCrash::RunTest(const FString& Param
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeRunner_Static_GetClaudePathNoCrash,
-	"UnrealClaude.ClaudeRunner.Static.GetClaudePathNoCrash",
+	FChatBackend_Static_GetClaudePathNoCrash,
+	"UnrealClaude.ChatBackend.Static.GetClaudePathNoCrash",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeRunner_Static_GetClaudePathNoCrash::RunTest(const FString& Parameters)
+bool FChatBackend_Static_GetClaudePathNoCrash::RunTest(const FString& Parameters)
 {
 	// Don't assert the result — Claude CLI may or may not be installed.
 	// Just verify the call doesn't crash.
@@ -430,12 +432,12 @@ bool FClaudeRunner_Static_GetClaudePathNoCrash::RunTest(const FString& Parameter
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeRunner_Instance_IsNotExecutingOnConstruction,
-	"UnrealClaude.ClaudeRunner.Instance.IsNotExecutingOnConstruction",
+	FChatBackend_Instance_IsNotExecutingOnConstruction,
+	"UnrealClaude.ChatBackend.Instance.IsNotExecutingOnConstruction",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeRunner_Instance_IsNotExecutingOnConstruction::RunTest(const FString& Parameters)
+bool FChatBackend_Instance_IsNotExecutingOnConstruction::RunTest(const FString& Parameters)
 {
 	FClaudeCodeRunner Runner;
 
@@ -448,33 +450,33 @@ bool FClaudeRunner_Instance_IsNotExecutingOnConstruction::RunTest(const FString&
 // ===== Interface Contract Tests =====
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
-	FClaudeRunner_Interface_MockRunnerAsIClaudeRunner,
-	"UnrealClaude.ClaudeRunner.Interface.MockRunnerAsIClaudeRunner",
+	FChatBackend_Interface_MockBackendAsIChatBackend,
+	"UnrealClaude.ChatBackend.Interface.MockBackendAsIChatBackend",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter
 )
 
-bool FClaudeRunner_Interface_MockRunnerAsIClaudeRunner::RunTest(const FString& Parameters)
+bool FChatBackend_Interface_MockBackendAsIChatBackend::RunTest(const FString& Parameters)
 {
-	// Verify FMockClaudeRunner can be used through IClaudeRunner interface
-	FMockClaudeRunner MockRunner;
-	IClaudeRunner* Runner = &MockRunner;
+	// Verify FMockChatBackend can be used through IChatBackend interface
+	FMockChatBackend MockBackend;
+	IChatBackend* Backend = &MockBackend;
 
-	TestNotNull("MockRunner should be castable to IClaudeRunner*", Runner);
-	TestTrue("Mock should be available", Runner->IsAvailable());
-	TestFalse("Mock should not be executing", Runner->IsExecuting());
+	TestNotNull("MockBackend should be castable to IChatBackend*", Backend);
+	TestTrue("Mock should be available", Backend->IsAvailable());
+	TestFalse("Mock should not be executing", Backend->IsExecuting());
 
 	// Test Cancel through interface
-	Runner->Cancel();
-	TestTrue("Cancel should set bCancelCalled", MockRunner.bCancelCalled);
+	Backend->Cancel();
+	TestTrue("Cancel should set bCancelCalled", MockBackend.bCancelCalled);
 
 	// Test ExecuteAsync through interface (synchronous fake)
-	FClaudeRequestConfig Config;
+	FChatRequestConfig Config;
 	Config.Prompt = TEXT("test prompt");
 
 	FString ReceivedResponse;
 	bool bReceivedSuccess = false;
 
-	FOnClaudeResponse OnComplete;
+	FOnChatResponse OnComplete;
 	OnComplete.BindLambda(
 		[&ReceivedResponse, &bReceivedSuccess](
 			const FString& Response, bool bSuccess)
@@ -483,13 +485,13 @@ bool FClaudeRunner_Interface_MockRunnerAsIClaudeRunner::RunTest(const FString& P
 			bReceivedSuccess = bSuccess;
 		});
 
-	bool bStarted = Runner->ExecuteAsync(Config, OnComplete);
+	bool bStarted = Backend->ExecuteAsync(Config, OnComplete);
 
 	TestTrue("ExecuteAsync should return true", bStarted);
 	TestTrue("bExecuteAsyncCalled should be set",
-		MockRunner.bExecuteAsyncCalled);
+		MockBackend.bExecuteAsyncCalled);
 	TestEqual("LastPrompt should capture the prompt",
-		MockRunner.LastPrompt, TEXT("test prompt"));
+		MockBackend.LastPrompt, TEXT("test prompt"));
 	TestEqual("Should receive mock response",
 		ReceivedResponse, TEXT("mock response"));
 	TestTrue("Should report success", bReceivedSuccess);

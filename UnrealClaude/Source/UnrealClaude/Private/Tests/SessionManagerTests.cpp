@@ -1,7 +1,7 @@
 // Copyright Natali Caggiano. All Rights Reserved.
 
 /**
- * Unit tests for FClaudeSessionManager.
+ * Unit tests for FChatSessionManager.
  * Tests standalone instances (NOT the singleton subsystem).
  * Covers construction defaults, history state machine, configuration,
  * and persistence (save/load/round-trip).
@@ -11,7 +11,7 @@
 
 #include "CoreMinimal.h"
 #include "Misc/AutomationTest.h"
-#include "ClaudeSessionManager.h"
+#include "ChatSessionManager.h"
 #include "HAL/FileManager.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -26,7 +26,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSessionManager_Construction_EmptyHistory::RunTest(const FString& Parameters)
 {
-	FClaudeSessionManager Manager;
+	FChatSessionManager Manager;
 
 	TestEqual("Fresh manager should have empty history",
 		Manager.GetHistory().Num(), 0);
@@ -42,7 +42,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSessionManager_Construction_PositiveMaxHistorySize::RunTest(const FString& Parameters)
 {
-	FClaudeSessionManager Manager;
+	FChatSessionManager Manager;
 
 	TestTrue("Default MaxHistorySize should be positive",
 		Manager.GetMaxHistorySize() > 0);
@@ -60,7 +60,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSessionManager_History_AddExchangeStoresData::RunTest(const FString& Parameters)
 {
-	FClaudeSessionManager Manager;
+	FChatSessionManager Manager;
 
 	Manager.AddExchange(TEXT("Hello"), TEXT("World"));
 
@@ -82,7 +82,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSessionManager_History_MultipleAddsFIFOOrder::RunTest(const FString& Parameters)
 {
-	FClaudeSessionManager Manager;
+	FChatSessionManager Manager;
 
 	Manager.AddExchange(TEXT("First"), TEXT("Response1"));
 	Manager.AddExchange(TEXT("Second"), TEXT("Response2"));
@@ -108,7 +108,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSessionManager_History_ClearHistoryEmpties::RunTest(const FString& Parameters)
 {
-	FClaudeSessionManager Manager;
+	FChatSessionManager Manager;
 
 	Manager.AddExchange(TEXT("Prompt1"), TEXT("Response1"));
 	Manager.AddExchange(TEXT("Prompt2"), TEXT("Response2"));
@@ -131,7 +131,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSessionManager_History_MaxSizeEnforcement::RunTest(const FString& Parameters)
 {
-	FClaudeSessionManager Manager;
+	FChatSessionManager Manager;
 	Manager.SetMaxHistorySize(3);
 
 	// Add 5 exchanges — only last 3 should remain
@@ -163,7 +163,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSessionManager_Config_GetMaxHistorySize::RunTest(const FString& Parameters)
 {
-	FClaudeSessionManager Manager;
+	FChatSessionManager Manager;
 
 	// Default should match the constant
 	int32 DefaultMax = Manager.GetMaxHistorySize();
@@ -183,7 +183,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSessionManager_Config_SetMaxHistorySize::RunTest(const FString& Parameters)
 {
-	FClaudeSessionManager Manager;
+	FChatSessionManager Manager;
 
 	Manager.SetMaxHistorySize(25);
 	TestEqual("MaxHistorySize should be set to 25",
@@ -204,7 +204,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSessionManager_Config_ClampZeroToMinOne::RunTest(const FString& Parameters)
 {
-	FClaudeSessionManager Manager;
+	FChatSessionManager Manager;
 
 	Manager.SetMaxHistorySize(0);
 	TestEqual("Setting MaxHistorySize=0 should clamp to 1",
@@ -221,7 +221,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSessionManager_Config_ClampNegativeToMinOne::RunTest(const FString& Parameters)
 {
-	FClaudeSessionManager Manager;
+	FChatSessionManager Manager;
 
 	Manager.SetMaxHistorySize(-10);
 	TestEqual("Setting MaxHistorySize=-10 should clamp to 1",
@@ -244,7 +244,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSessionManager_Persistence_SaveSessionWritesFile::RunTest(const FString& Parameters)
 {
-	FClaudeSessionManager Manager;
+	FChatSessionManager Manager;
 	Manager.AddExchange(TEXT("TestPrompt"), TEXT("TestResponse"));
 
 	bool bSaved = Manager.SaveSession();
@@ -269,14 +269,14 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FSessionManager_Persistence_LoadSessionRoundTrip::RunTest(const FString& Parameters)
 {
 	// Save with one manager
-	FClaudeSessionManager SaveManager;
+	FChatSessionManager SaveManager;
 	SaveManager.AddExchange(TEXT("RoundTripPrompt"), TEXT("RoundTripResponse"));
 	SaveManager.AddExchange(TEXT("SecondPrompt"), TEXT("SecondResponse"));
 	bool bSaved = SaveManager.SaveSession();
 	TestTrue("SaveSession should succeed", bSaved);
 
 	// Load with a fresh manager
-	FClaudeSessionManager LoadManager;
+	FChatSessionManager LoadManager;
 	bool bLoaded = LoadManager.LoadSession();
 	TestTrue("LoadSession should return true", bLoaded);
 
@@ -305,7 +305,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSessionManager_Persistence_GetSessionFilePathContainsUnrealClaude::RunTest(const FString& Parameters)
 {
-	FClaudeSessionManager Manager;
+	FChatSessionManager Manager;
 
 	FString SessionPath = Manager.GetSessionFilePath();
 	TestTrue("Session file path should contain 'UnrealClaude'",
@@ -322,7 +322,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSessionManager_Persistence_HasSavedSessionTrueAfterSave::RunTest(const FString& Parameters)
 {
-	FClaudeSessionManager Manager;
+	FChatSessionManager Manager;
 
 	// Ensure no leftover file
 	IFileManager::Get().Delete(*Manager.GetSessionFilePath());
@@ -349,7 +349,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FSessionManager_Persistence_LoadSessionNoFileReturnsFalse::RunTest(const FString& Parameters)
 {
-	FClaudeSessionManager Manager;
+	FChatSessionManager Manager;
 
 	// Ensure no file exists
 	IFileManager::Get().Delete(*Manager.GetSessionFilePath());

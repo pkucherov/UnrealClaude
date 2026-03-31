@@ -12,8 +12,8 @@
 
 #include "CoreMinimal.h"
 #include "Misc/AutomationTest.h"
-#include "ClaudeSubsystem.h"
-#include "IClaudeRunner.h"
+#include "ChatSubsystem.h"
+#include "IChatBackend.h"
 #include "ProjectContext.h"
 #include "ScriptExecutionManager.h"
 
@@ -29,10 +29,10 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUnrealClaudeModule_Startup_SubsystemInitialized::RunTest(const FString& Parameters)
 {
-	FClaudeCodeSubsystem& Subsystem = FClaudeCodeSubsystem::Get();
+	FChatSubsystem& Subsystem = FChatSubsystem::Get();
 
 	TestEqual("Subsystem singleton should return consistent address",
-		&Subsystem, &FClaudeCodeSubsystem::Get());
+		&Subsystem, &FChatSubsystem::Get());
 
 	return true;
 }
@@ -45,10 +45,10 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUnrealClaudeModule_Startup_RunnerAvailable::RunTest(const FString& Parameters)
 {
-	FClaudeCodeSubsystem& Subsystem = FClaudeCodeSubsystem::Get();
-	IClaudeRunner* Runner = Subsystem.GetRunner();
+	FChatSubsystem& Subsystem = FChatSubsystem::Get();
+	IChatBackend* Backend = Subsystem.GetBackend();
 
-	TestNotNull("Module should have initialized a runner", Runner);
+	TestNotNull("Module should have initialized a backend", Backend);
 
 	return true;
 }
@@ -61,7 +61,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FUnrealClaudeModule_Startup_SystemPromptBuilt::RunTest(const FString& Parameters)
 {
-	FClaudeCodeSubsystem& Subsystem = FClaudeCodeSubsystem::Get();
+	FChatSubsystem& Subsystem = FChatSubsystem::Get();
 	FString SystemPrompt = Subsystem.GetUE57SystemPrompt();
 
 	TestTrue("System prompt should be non-empty after module startup",

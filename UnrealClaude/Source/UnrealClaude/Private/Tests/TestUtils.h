@@ -2,7 +2,7 @@
 
 /**
  * Shared test utilities for UnrealClaude automation tests.
- * Provides JSON factories, temp file helpers, and FMockClaudeRunner
+ * Provides JSON factories, temp file helpers, and FMockChatBackend
  * for use across all UnrealClaude test files.
  */
 
@@ -10,7 +10,8 @@
 
 #include "CoreMinimal.h"
 #include "Dom/JsonObject.h"
-#include "IClaudeRunner.h"
+#include "IChatBackend.h"
+#include "ChatBackendTypes.h"
 #include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -84,13 +85,13 @@ static void CleanupTestTempDir()
 	IFileManager::Get().DeleteDirectory(*GetTestTempDir(), false, true);
 }
 
-// ===== Mock Runner =====
+// ===== Mock Backend =====
 
 /**
- * Mock implementation of IClaudeRunner for testing.
+ * Mock implementation of IChatBackend for testing.
  * Does not spawn subprocesses or threads — all calls are synchronous fakes.
  */
-class FMockClaudeRunner : public IClaudeRunner
+class FMockChatBackend : public IChatBackend
 {
 public:
 	/** Whether ExecuteAsync was called */
@@ -108,12 +109,12 @@ public:
 	/** The last prompt received */
 	FString LastPrompt;
 
-	// IClaudeRunner interface
+	// IChatBackend interface
 
 	virtual bool ExecuteAsync(
-		const FClaudeRequestConfig& Config,
-		FOnClaudeResponse OnComplete,
-		FOnClaudeProgress OnProgress = FOnClaudeProgress()) override
+		const FChatRequestConfig& Config,
+		FOnChatResponse OnComplete,
+		FOnChatProgress OnProgress = FOnChatProgress()) override
 	{
 		bExecuteAsyncCalled = true;
 		LastPrompt = Config.Prompt;
@@ -122,7 +123,7 @@ public:
 	}
 
 	virtual bool ExecuteSync(
-		const FClaudeRequestConfig& Config,
+		const FChatRequestConfig& Config,
 		FString& OutResponse) override
 	{
 		LastPrompt = Config.Prompt;
@@ -143,6 +144,29 @@ public:
 	virtual bool IsAvailable() const override
 	{
 		return true;
+	}
+
+	virtual FString GetDisplayName() const override
+	{
+		return TEXT("MockBackend");
+	}
+
+	virtual EChatBackendType GetBackendType() const override
+	{
+		return EChatBackendType::Claude;
+	}
+
+	virtual FString FormatPrompt(
+		const TArray<TPair<FString, FString>>& History,
+		const FString& SystemPrompt,
+		const FString& ProjectContext) const override
+	{
+		return History.Num() > 0 ? History.Last().Key : TEXT("");
+	}
+
+	virtual TUniquePtr<FChatRequestConfig> CreateConfig() const override
+	{
+		return MakeUnique<FChatRequestConfig>();
 	}
 };
 
