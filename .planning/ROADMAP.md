@@ -31,7 +31,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans:** 5 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Test infrastructure (TestUtils.h) + ClaudeSubsystem + ClaudeRunner tests
+- [x] 01-01-PLAN.md — Test infrastructure (TestUtils.h) + ClaudeSubsystem + ClaudeRunner tests
 - [ ] 01-02-PLAN.md — SessionManager + MCPServer + Constants tests
 - [ ] 01-03-PLAN.md — ProjectContext + ScriptExecution + Module startup tests
 - [ ] 01-04-PLAN.md — Slate widget tests + MCPTaskQueue latent test fix attempt
