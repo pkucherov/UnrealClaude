@@ -13,7 +13,7 @@ This roadmap adds OpenCode as a second AI backend to the UnrealClaude editor plu
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Test Baseline** - Establish existing test coverage baseline before any code changes
-- [ ] **Phase 2: Backend Abstraction** - Generalize IClaudeRunner into backend-agnostic IChatBackend interface
+- [x] **Phase 2: Backend Abstraction** - Generalize IClaudeRunner into backend-agnostic IChatBackend interface
 - [ ] **Phase 3: SSE Parser & Server Lifecycle** - Build and test the independent OpenCode components (SSE stream parsing, server auto-detect/spawn/shutdown)
 - [ ] **Phase 4: OpenCode Runner & Sessions** - Compose components into FOpenCodeRunner with session management, MCP registration, and full API integration
 - [ ] **Phase 5: Chat UI & Backend Switching** - Add toolbar backend switcher, status indicators, unified history, and backend switching tests
@@ -49,7 +49,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 02-01-PLAN.md — Full rename + abstraction: new IChatBackend/ChatBackendTypes, rename 13+ files, refactor subsystem/widgets/runner, update all tests, add ~19 new abstraction tests
+- [x] 02-01-PLAN.md — Full rename + abstraction: new IChatBackend/ChatBackendTypes, rename 13+ files, refactor subsystem/widgets/runner, update all tests, add ~19 new abstraction tests
 
 ### Phase 3: SSE Parser & Server Lifecycle
 **Goal**: The two most technically complex OpenCode components are built and thoroughly tested in isolation, before any integration with existing code
@@ -97,7 +97,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Test Baseline | 5/5 | Complete | 2026-03-31 |
-| 2. Backend Abstraction | 0/1 | Not started | - |
+| 2. Backend Abstraction | 1/1 | Complete | 2026-03-31 |
 | 3. SSE Parser & Server Lifecycle | 0/TBD | Not started | - |
 | 4. OpenCode Runner & Sessions | 0/TBD | Not started | - |
 | 5. Chat UI & Backend Switching | 0/TBD | Not started | - |

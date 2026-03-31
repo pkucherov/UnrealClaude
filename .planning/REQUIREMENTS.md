@@ -9,9 +9,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Abstraction Layer (ABST)
 
-- [ ] **ABST-01**: IClaudeRunner (or successor interface) generalized to IChatBackend with no Claude-specific assumptions — supports both subprocess and HTTP-based backends
-- [ ] **ABST-02**: EBackendType enum (Claude, OpenCode) introduced with serialization support for config persistence
-- [ ] **ABST-03**: ClaudeSubsystem routes chat requests to the active backend via the abstraction layer, swapping backends without restarting the editor
+- [x] **ABST-01**: IClaudeRunner (or successor interface) generalized to IChatBackend with no Claude-specific assumptions — supports both subprocess and HTTP-based backends
+- [x] **ABST-02**: EBackendType enum (Claude, OpenCode) introduced with serialization support for config persistence
+- [x] **ABST-03**: ClaudeSubsystem routes chat requests to the active backend via the abstraction layer, swapping backends without restarting the editor
 
 ### Communication Layer (COMM)
 
@@ -90,9 +90,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | TEST-00 | Phase 1: Test Baseline | Complete |
-| ABST-01 | Phase 2: Backend Abstraction | Pending |
-| ABST-02 | Phase 2: Backend Abstraction | Pending |
-| ABST-03 | Phase 2: Backend Abstraction | Pending |
+| ABST-01 | Phase 2: Backend Abstraction | Complete |
+| ABST-02 | Phase 2: Backend Abstraction | Complete |
+| ABST-03 | Phase 2: Backend Abstraction | Complete |
 | COMM-02 | Phase 3: SSE Parser & Server Lifecycle | Pending |
 | COMM-03 | Phase 3: SSE Parser & Server Lifecycle | Pending |
 | SRVR-01 | Phase 3: SSE Parser & Server Lifecycle | Pending |
