@@ -23,11 +23,11 @@ Users can get AI coding assistance inside the Unreal Editor from either Claude C
 - ✓ Multi-platform support: Win64, Linux, macOS (Apple Silicon) — existing
 - ✓ Keyboard shortcuts and Tools menu integration — existing
 - ✓ IClaudeRunner abstraction for Claude CLI execution — existing
+- ✓ IChatBackend abstraction with 9 pure virtual methods, EChatBackendType enum, polymorphic config, FChatBackendFactory — Validated in Phase 2: Backend Abstraction
 
 ### Active
 
 - [ ] OpenCode HTTP server backend (communicate via REST API + SSE events with `opencode serve`)
-- [ ] Generalized backend abstraction (refactor IClaudeRunner into a backend-agnostic interface supporting both Claude CLI subprocess and OpenCode HTTP)
 - [ ] Auto-detect/spawn OpenCode server (try connecting to existing `opencode serve` instance, spawn one if none found)
 - [ ] Toolbar backend switcher (dropdown/button in chat toolbar to switch between Claude and OpenCode at runtime)
 - [ ] Plugin settings for default backend (configurable in UE Editor preferences, persisted across sessions)
@@ -47,10 +47,10 @@ Users can get AI coding assistance inside the Unreal Editor from either Claude C
 
 ## Context
 
-- **Existing architecture:** The plugin has a clean `IClaudeRunner` interface that abstracts Claude CLI execution. `FClaudeCodeRunner` implements it by spawning `claude -p --stream-json` as a subprocess. A new `FOpenCodeRunner` would implement the same interface but talk to OpenCode's HTTP server instead.
+- **Existing architecture:** The plugin uses an `IChatBackend` interface (9 pure virtual methods) that abstracts chat execution. `FClaudeCodeRunner` implements it by spawning `claude -p --stream-json` as a subprocess. `FChatSubsystem` owns the active backend via `TUniquePtr<IChatBackend>` and can swap backends at runtime via `FChatBackendFactory`. A new `FOpenCodeRunner` would implement `IChatBackend` to talk to OpenCode's HTTP server.
 - **OpenCode CLI capabilities:** OpenCode provides `opencode serve` which starts a headless HTTP server (default port 4096) with a full REST API including session management, message sending, SSE event streaming, and dynamic MCP server registration. It supports `--format json` for raw JSON events.
 - **OpenCode MCP support:** OpenCode can consume MCP servers configured in `opencode.json` or registered dynamically via `POST /mcp`. The existing MCP bridge can be registered as a local MCP server so OpenCode's LLM gets access to all 30+ editor tools.
-- **Stream format difference:** Claude uses NDJSON (newline-delimited JSON) over subprocess stdout. OpenCode uses Server-Sent Events over HTTP. Both need to map to the existing `FClaudeStreamEvent` / `EClaudeStreamEventType` model (or a generalized version of it).
+- **Stream format difference:** Claude uses NDJSON (newline-delimited JSON) over subprocess stdout. OpenCode uses Server-Sent Events over HTTP. Both map to the existing `FChatStreamEvent` / `EChatStreamEventType` model in `ChatBackendTypes.h`.
 - **Existing codebase map:** Full architectural analysis available in `.planning/codebase/` covering architecture, stack, structure, conventions, integrations, testing, and concerns.
 
 ## Constraints
@@ -89,4 +89,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-30 after initialization*
+*Last updated: 2026-04-01 after Phase 2 completion*
