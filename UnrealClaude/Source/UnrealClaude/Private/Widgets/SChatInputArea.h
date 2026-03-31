@@ -16,13 +16,13 @@ DECLARE_DELEGATE_OneParam(FOnTextChangedEvent, const FString&)
 DECLARE_DELEGATE_OneParam(FOnImagesChanged, const TArray<FString>&)
 
 /**
- * Input area widget for Claude Editor
+ * Input area widget for chat editor
  * Handles multi-line text input with paste, send/cancel buttons, and multi-image attachment
  */
-class SClaudeInputArea : public SCompoundWidget
+class SChatInputArea : public SCompoundWidget
 {
 public:
-	SLATE_BEGIN_ARGS(SClaudeInputArea)
+	SLATE_BEGIN_ARGS(SChatInputArea)
 		: _bIsWaiting(false)
 	{}
 		SLATE_ATTRIBUTE(bool, bIsWaiting)

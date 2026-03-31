@@ -1,6 +1,6 @@
 // Copyright Natali Caggiano. All Rights Reserved.
 
-#include "SClaudeInputArea.h"
+#include "SChatInputArea.h"
 #include "ClipboardImageUtils.h"
 #include "UnrealClaudeConstants.h"
 #include "UnrealClaudeModule.h"
@@ -22,7 +22,7 @@
 
 #define LOCTEXT_NAMESPACE "UnrealClaude"
 
-void SClaudeInputArea::Construct(const FArguments& InArgs)
+void SChatInputArea::Construct(const FArguments& InArgs)
 {
 	bIsWaiting = InArgs._bIsWaiting;
 	OnSend = InArgs._OnSend;
@@ -65,9 +65,9 @@ void SClaudeInputArea::Construct(const FArguments& InArgs)
 						.HintText(LOCTEXT("InputHint", "Ask Claude about Unreal Engine 5.7... (Shift+Enter for newline)"))
 						.AutoWrapText(true)
 						.AllowMultiLine(true)
-						.OnTextChanged(this, &SClaudeInputArea::HandleTextChanged)
-						.OnTextCommitted(this, &SClaudeInputArea::HandleTextCommitted)
-						.OnKeyDownHandler(this, &SClaudeInputArea::OnInputKeyDown)
+						.OnTextChanged(this, &SChatInputArea::HandleTextChanged)
+						.OnTextCommitted(this, &SChatInputArea::HandleTextCommitted)
+						.OnKeyDownHandler(this, &SChatInputArea::OnInputKeyDown)
 						.IsEnabled_Lambda([this]() { return !bIsWaiting.Get(); })
 					]
 				]
@@ -88,7 +88,7 @@ void SClaudeInputArea::Construct(const FArguments& InArgs)
 				[
 					SNew(SButton)
 					.Text(LOCTEXT("Paste", "Paste"))
-					.OnClicked(this, &SClaudeInputArea::HandlePasteClicked)
+					.OnClicked(this, &SChatInputArea::HandlePasteClicked)
 					.ToolTipText(LOCTEXT("PasteTip", "Paste text or image from clipboard"))
 					.IsEnabled_Lambda([this]() { return !bIsWaiting.Get(); })
 				]
@@ -99,7 +99,7 @@ void SClaudeInputArea::Construct(const FArguments& InArgs)
 				[
 					SNew(SButton)
 					.Text_Lambda([this]() { return bIsWaiting.Get() ? LOCTEXT("Cancel", "Cancel") : LOCTEXT("Send", "Send"); })
-					.OnClicked(this, &SClaudeInputArea::HandleSendCancelClicked)
+					.OnClicked(this, &SChatInputArea::HandleSendCancelClicked)
 					.ButtonStyle(FAppStyle::Get(), "PrimaryButton")
 				]
 			]
@@ -127,7 +127,7 @@ void SClaudeInputArea::Construct(const FArguments& InArgs)
 	];
 }
 
-void SClaudeInputArea::SetText(const FString& NewText)
+void SChatInputArea::SetText(const FString& NewText)
 {
 	CurrentInputText = NewText;
 	if (InputTextBox.IsValid())
@@ -136,12 +136,12 @@ void SClaudeInputArea::SetText(const FString& NewText)
 	}
 }
 
-FString SClaudeInputArea::GetText() const
+FString SChatInputArea::GetText() const
 {
 	return CurrentInputText;
 }
 
-void SClaudeInputArea::ClearText()
+void SChatInputArea::ClearText()
 {
 	CurrentInputText.Empty();
 	if (InputTextBox.IsValid())
@@ -151,29 +151,29 @@ void SClaudeInputArea::ClearText()
 	ClearAttachedImages();
 }
 
-bool SClaudeInputArea::HasAttachedImages() const
+bool SChatInputArea::HasAttachedImages() const
 {
 	return AttachedImagePaths.Num() > 0;
 }
 
-int32 SClaudeInputArea::GetAttachedImageCount() const
+int32 SChatInputArea::GetAttachedImageCount() const
 {
 	return AttachedImagePaths.Num();
 }
 
-TArray<FString> SClaudeInputArea::GetAttachedImagePaths() const
+TArray<FString> SChatInputArea::GetAttachedImagePaths() const
 {
 	return AttachedImagePaths;
 }
 
-void SClaudeInputArea::ClearAttachedImages()
+void SChatInputArea::ClearAttachedImages()
 {
 	AttachedImagePaths.Empty();
 	ThumbnailBrushes.Empty();
 	RebuildImagePreviewStrip();
 }
 
-void SClaudeInputArea::RemoveAttachedImage(int32 Index)
+void SChatInputArea::RemoveAttachedImage(int32 Index)
 {
 	if (AttachedImagePaths.IsValidIndex(Index))
 	{
@@ -184,7 +184,7 @@ void SClaudeInputArea::RemoveAttachedImage(int32 Index)
 	}
 }
 
-FReply SClaudeInputArea::OnInputKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
+FReply SChatInputArea::OnInputKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
 {
 	// Ctrl+V: try image paste first, fall back to text paste
 	if (InKeyEvent.GetKey() == EKeys::V && InKeyEvent.IsControlDown())
@@ -211,18 +211,18 @@ FReply SClaudeInputArea::OnInputKeyDown(const FGeometry& MyGeometry, const FKeyE
 	return FReply::Unhandled();
 }
 
-void SClaudeInputArea::HandleTextChanged(const FText& NewText)
+void SChatInputArea::HandleTextChanged(const FText& NewText)
 {
 	CurrentInputText = NewText.ToString();
 	OnTextChangedDelegate.ExecuteIfBound(CurrentInputText);
 }
 
-void SClaudeInputArea::HandleTextCommitted(const FText& NewText, ETextCommit::Type CommitType)
+void SChatInputArea::HandleTextCommitted(const FText& NewText, ETextCommit::Type CommitType)
 {
 	// Don't send on commit - use explicit Enter key handling
 }
 
-FReply SClaudeInputArea::HandlePasteClicked()
+FReply SChatInputArea::HandlePasteClicked()
 {
 	// Try image paste first
 	if (TryPasteImageFromClipboard())
@@ -242,7 +242,7 @@ FReply SClaudeInputArea::HandlePasteClicked()
 	return FReply::Handled();
 }
 
-FReply SClaudeInputArea::HandleSendCancelClicked()
+FReply SChatInputArea::HandleSendCancelClicked()
 {
 	if (bIsWaiting.Get())
 	{
@@ -255,7 +255,7 @@ FReply SClaudeInputArea::HandleSendCancelClicked()
 	return FReply::Handled();
 }
 
-bool SClaudeInputArea::TryPasteImageFromClipboard()
+bool SChatInputArea::TryPasteImageFromClipboard()
 {
 	using namespace UnrealClaudeConstants::ClipboardImage;
 
@@ -291,13 +291,13 @@ bool SClaudeInputArea::TryPasteImageFromClipboard()
 	return true;
 }
 
-FReply SClaudeInputArea::HandleRemoveImageClicked(int32 Index)
+FReply SChatInputArea::HandleRemoveImageClicked(int32 Index)
 {
 	RemoveAttachedImage(Index);
 	return FReply::Handled();
 }
 
-void SClaudeInputArea::RebuildImagePreviewStrip()
+void SChatInputArea::RebuildImagePreviewStrip()
 {
 	using namespace UnrealClaudeConstants::ClipboardImage;
 
@@ -380,7 +380,7 @@ void SClaudeInputArea::RebuildImagePreviewStrip()
 	];
 }
 
-TSharedPtr<FSlateDynamicImageBrush> SClaudeInputArea::CreateThumbnailBrush(const FString& FilePath) const
+TSharedPtr<FSlateDynamicImageBrush> SChatInputArea::CreateThumbnailBrush(const FString& FilePath) const
 {
 	// Load PNG file from disk
 	TArray<uint8> PngData;

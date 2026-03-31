@@ -1,15 +1,14 @@
 // Copyright Natali Caggiano. All Rights Reserved.
 
-#include "ClaudeEditorWidget.h"
-#include "ClaudeCodeRunner.h"
-#include "ClaudeSubsystem.h"
+#include "ChatEditorWidget.h"
+#include "ChatSubsystem.h"
 #include "UnrealClaudeModule.h"
 #include "UnrealClaudeConstants.h"
 #include "ProjectContext.h"
 #include "MCP/UnrealClaudeMCPServer.h"
 #include "MCP/MCPToolRegistry.h"
-#include "Widgets/SClaudeToolbar.h"
-#include "Widgets/SClaudeInputArea.h"
+#include "Widgets/SChatToolbar.h"
+#include "Widgets/SChatInputArea.h"
 
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Layout/SBorder.h"
@@ -53,7 +52,7 @@ void SChatMessage::Construct(const FArguments& InArgs)
 		? FLinearColor(0.4f, 0.6f, 1.0f)   // Light blue
 		: FLinearColor(0.9f, 0.6f, 0.3f);  // Warm orange
 
-	FString RoleLabel = bIsUser ? TEXT("> You") : TEXT("Claude");
+	FString RoleLabel = bIsUser ? TEXT("> You") : FChatSubsystem::Get().GetBackendDisplayName();
 
 	ChildSlot
 	[
@@ -110,10 +109,10 @@ void SChatMessage::Construct(const FArguments& InArgs)
 }
 
 // ============================================================================
-// SClaudeEditorWidget
+// SChatEditorWidget
 // ============================================================================
 
-void SClaudeEditorWidget::Construct(const FArguments& InArgs)
+void SChatEditorWidget::Construct(const FArguments& InArgs)
 {
 	ChildSlot
 	[
@@ -164,7 +163,7 @@ void SClaudeEditorWidget::Construct(const FArguments& InArgs)
 	];
 	
 	// Check Claude availability on startup
-	if (!IsClaudeAvailable())
+	if (!IsBackendAvailable())
 	{
 		AddMessage(TEXT("⚠️ Claude CLI not found.\n\nPlease install Claude Code:\n  npm install -g @anthropic-ai/claude-code\n\nThen authenticate:\n  claude auth login"), false);
 	}
@@ -180,18 +179,18 @@ void SClaudeEditorWidget::Construct(const FArguments& InArgs)
 	}
 }
 
-SClaudeEditorWidget::~SClaudeEditorWidget()
+SChatEditorWidget::~SChatEditorWidget()
 {
 	// Cancel any pending requests
-	FClaudeCodeSubsystem::Get().CancelCurrentRequest();
+	FChatSubsystem::Get().CancelCurrentRequest();
 }
 
-TSharedRef<SWidget> SClaudeEditorWidget::BuildToolbar()
+TSharedRef<SWidget> SChatEditorWidget::BuildToolbar()
 {
-	return SNew(SClaudeToolbar)
+	return SNew(SChatToolbar)
 		.bUE57ContextEnabled_Lambda([this]() { return bIncludeUE57Context; })
 		.bProjectContextEnabled_Lambda([this]() { return bIncludeProjectContext; })
-		.bRestoreEnabled_Lambda([this]() { return FClaudeCodeSubsystem::Get().HasSavedSession(); })
+		.bRestoreEnabled_Lambda([this]() { return FChatSubsystem::Get().HasSavedSession(); })
 		.OnUE57ContextChanged_Lambda([this](bool bEnabled) { bIncludeUE57Context = bEnabled; })
 		.OnProjectContextChanged_Lambda([this](bool bEnabled) { bIncludeProjectContext = bEnabled; })
 		.OnRefreshContext_Lambda([this]() { RefreshProjectContext(); })
@@ -201,7 +200,7 @@ TSharedRef<SWidget> SClaudeEditorWidget::BuildToolbar()
 		.OnCopyLast_Lambda([this]() { CopyToClipboard(); });
 }
 
-TSharedRef<SWidget> SClaudeEditorWidget::BuildChatArea()
+TSharedRef<SWidget> SChatEditorWidget::BuildChatArea()
 {
 	return SNew(SBorder)
 		.BorderImage(FAppStyle::GetBrush("ToolPanel.DarkGroupBorder"))
@@ -215,9 +214,9 @@ TSharedRef<SWidget> SClaudeEditorWidget::BuildChatArea()
 		];
 }
 
-TSharedRef<SWidget> SClaudeEditorWidget::BuildInputArea()
+TSharedRef<SWidget> SChatEditorWidget::BuildInputArea()
 {
-	SAssignNew(InputArea, SClaudeInputArea)
+	SAssignNew(InputArea, SChatInputArea)
 		.bIsWaiting_Lambda([this]() { return bIsWaitingForResponse; })
 		.OnSend_Lambda([this]() { SendMessage(); })
 		.OnCancel_Lambda([this]() { CancelRequest(); })
@@ -226,7 +225,7 @@ TSharedRef<SWidget> SClaudeEditorWidget::BuildInputArea()
 	return InputArea.ToSharedRef();
 }
 
-TSharedRef<SWidget> SClaudeEditorWidget::BuildStatusBar()
+TSharedRef<SWidget> SChatEditorWidget::BuildStatusBar()
 {
 	return SNew(SBorder)
 		.BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
@@ -240,8 +239,8 @@ TSharedRef<SWidget> SClaudeEditorWidget::BuildStatusBar()
 			.VAlign(VAlign_Center)
 			[
 				SNew(STextBlock)
-				.Text(this, &SClaudeEditorWidget::GetStatusText)
-				.ColorAndOpacity(this, &SClaudeEditorWidget::GetStatusColor)
+				.Text(this, &SChatEditorWidget::GetStatusText)
+				.ColorAndOpacity(this, &SChatEditorWidget::GetStatusColor)
 			]
 			
 			+ SHorizontalBox::Slot()
@@ -277,7 +276,7 @@ TSharedRef<SWidget> SClaudeEditorWidget::BuildStatusBar()
 		];
 }
 
-void SClaudeEditorWidget::AddMessage(const FString& Message, bool bIsUser)
+void SChatEditorWidget::AddMessage(const FString& Message, bool bIsUser)
 {
 	if (ChatMessagesBox.IsValid())
 	{
@@ -310,7 +309,7 @@ void SClaudeEditorWidget::AddMessage(const FString& Message, bool bIsUser)
 	}
 }
 
-void SClaudeEditorWidget::SendMessage()
+void SChatEditorWidget::SendMessage()
 {
 	// Extract image paths before checking emptiness
 	TArray<FString> ImagePaths;
@@ -327,7 +326,7 @@ void SClaudeEditorWidget::SendMessage()
 		return;
 	}
 
-	if (!IsClaudeAvailable())
+	if (!IsBackendAvailable())
 	{
 		AddMessage(TEXT("Claude CLI is not available. Please install it first."), false);
 		return;
@@ -381,21 +380,21 @@ void SClaudeEditorWidget::SendMessage()
 	// Start streaming response display
 	StartStreamingResponse();
 
-	// Send to Claude using FClaudePromptOptions
-	FOnClaudeResponse OnComplete;
-	OnComplete.BindSP(this, &SClaudeEditorWidget::OnClaudeResponse);
+	// Send prompt using FChatPromptOptions
+	FOnChatResponse OnComplete;
+	OnComplete.BindSP(this, &SChatEditorWidget::OnChatResponse);
 
-	FClaudePromptOptions Options;
+	FChatPromptOptions Options;
 	Options.bIncludeEngineContext = bIncludeUE57Context;
 	Options.bIncludeProjectContext = bIncludeProjectContext;
-	Options.OnProgress.BindSP(this, &SClaudeEditorWidget::OnClaudeProgress);
-	Options.OnStreamEvent.BindSP(this, &SClaudeEditorWidget::OnClaudeStreamEvent);
+	Options.OnProgress.BindSP(this, &SChatEditorWidget::OnChatProgress);
+	Options.OnStreamEvent.BindSP(this, &SChatEditorWidget::OnChatStreamEvent);
 	Options.AttachedImagePaths = ImagePaths;
 
-	FClaudeCodeSubsystem::Get().SendPrompt(Prompt, OnComplete, Options);
+	FChatSubsystem::Get().SendPrompt(Prompt, OnComplete, Options);
 }
 
-void SClaudeEditorWidget::OnClaudeResponse(const FString& Response, bool bSuccess)
+void SChatEditorWidget::OnChatResponse(const FString& Response, bool bSuccess)
 {
 	bIsWaitingForResponse = false;
 
@@ -434,14 +433,14 @@ void SClaudeEditorWidget::OnClaudeResponse(const FString& Response, bool bSucces
 	StreamingResponse.Empty();
 }
 
-void SClaudeEditorWidget::ClearChat()
+void SChatEditorWidget::ClearChat()
 {
 	if (ChatMessagesBox.IsValid())
 	{
 		ChatMessagesBox->ClearChildren();
 	}
 
-	FClaudeCodeSubsystem::Get().ClearHistory();
+	FChatSubsystem::Get().ClearHistory();
 	LastResponse.Empty();
 	ResetStreamingState();
 
@@ -449,14 +448,14 @@ void SClaudeEditorWidget::ClearChat()
 	AddMessage(TEXT("Chat cleared. Ready for new questions!"), false);
 }
 
-void SClaudeEditorWidget::CancelRequest()
+void SChatEditorWidget::CancelRequest()
 {
-	FClaudeCodeSubsystem::Get().CancelCurrentRequest();
+	FChatSubsystem::Get().CancelCurrentRequest();
 	bIsWaitingForResponse = false;
 	AddMessage(TEXT("Request cancelled."), false);
 }
 
-void SClaudeEditorWidget::CopyToClipboard()
+void SChatEditorWidget::CopyToClipboard()
 {
 	if (!LastResponse.IsEmpty())
 	{
@@ -465,9 +464,9 @@ void SClaudeEditorWidget::CopyToClipboard()
 	}
 }
 
-void SClaudeEditorWidget::RestoreSession()
+void SChatEditorWidget::RestoreSession()
 {
-	FClaudeCodeSubsystem& Subsystem = FClaudeCodeSubsystem::Get();
+	FChatSubsystem& Subsystem = FChatSubsystem::Get();
 
 	if (Subsystem.LoadSession())
 	{
@@ -503,7 +502,7 @@ void SClaudeEditorWidget::RestoreSession()
 	}
 }
 
-void SClaudeEditorWidget::NewSession()
+void SChatEditorWidget::NewSession()
 {
 	// Clear the chat display
 	if (ChatMessagesBox.IsValid())
@@ -512,7 +511,7 @@ void SClaudeEditorWidget::NewSession()
 	}
 
 	// Clear the subsystem history
-	FClaudeCodeSubsystem::Get().ClearHistory();
+	FChatSubsystem::Get().ClearHistory();
 
 	// Clear local state
 	LastResponse.Empty();
@@ -523,12 +522,12 @@ void SClaudeEditorWidget::NewSession()
 	AddMessage(TEXT("Ready for new questions!"), false);
 }
 
-bool SClaudeEditorWidget::IsClaudeAvailable() const
+bool SChatEditorWidget::IsBackendAvailable() const
 {
-	return FClaudeCodeRunner::IsClaudeAvailable();
+	return FChatSubsystem::Get().IsBackendAvailable();
 }
 
-FText SClaudeEditorWidget::GetStatusText() const
+FText SChatEditorWidget::GetStatusText() const
 {
 	if (bIsWaitingForResponse)
 	{
@@ -544,7 +543,7 @@ FText SClaudeEditorWidget::GetStatusText() const
 		return FText::FromString(StatusStr);
 	}
 
-	if (!IsClaudeAvailable())
+	if (!IsBackendAvailable())
 	{
 		return LOCTEXT("StatusUnavailable", "● Claude CLI not found");
 	}
@@ -557,14 +556,14 @@ FText SClaudeEditorWidget::GetStatusText() const
 	return LOCTEXT("StatusReady", "● Ready");
 }
 
-FSlateColor SClaudeEditorWidget::GetStatusColor() const
+FSlateColor SChatEditorWidget::GetStatusColor() const
 {
 	if (bIsWaitingForResponse)
 	{
 		return FSlateColor(FLinearColor(1.0f, 0.8f, 0.0f)); // Yellow
 	}
 
-	if (!IsClaudeAvailable())
+	if (!IsBackendAvailable())
 	{
 		return FSlateColor(FLinearColor(1.0f, 0.3f, 0.3f)); // Red
 	}
@@ -577,7 +576,7 @@ FSlateColor SClaudeEditorWidget::GetStatusColor() const
 	return FSlateColor(FLinearColor(0.3f, 1.0f, 0.3f)); // Green
 }
 
-void SClaudeEditorWidget::ResetStreamingState()
+void SChatEditorWidget::ResetStreamingState()
 {
 	StreamingResponse.Empty();
 	CurrentSegmentText.Empty();
@@ -600,7 +599,7 @@ void SClaudeEditorWidget::ResetStreamingState()
 	LastResultStats.Empty();
 }
 
-void SClaudeEditorWidget::StartStreamingResponse()
+void SChatEditorWidget::StartStreamingResponse()
 {
 	ResetStreamingState();
 	StreamingStartTime = FPlatformTime::Seconds();
@@ -697,7 +696,7 @@ void SClaudeEditorWidget::StartStreamingResponse()
 	}
 }
 
-void SClaudeEditorWidget::OnClaudeProgress(const FString& PartialOutput)
+void SChatEditorWidget::OnChatProgress(const FString& PartialOutput)
 {
 	// Append to total and current segment
 	StreamingResponse += PartialOutput;
@@ -716,30 +715,30 @@ void SClaudeEditorWidget::OnClaudeProgress(const FString& PartialOutput)
 	}
 }
 
-void SClaudeEditorWidget::OnClaudeStreamEvent(const FClaudeStreamEvent& Event)
+void SChatEditorWidget::OnChatStreamEvent(const FChatStreamEvent& Event)
 {
 	switch (Event.Type)
 	{
-	case EClaudeStreamEventType::SessionInit:
+	case EChatStreamEventType::SessionInit:
 		UE_LOG(LogUnrealClaude, Log, TEXT("[StreamEvent] SessionInit: session_id=%s"), *Event.SessionId);
 		break;
 
-	case EClaudeStreamEventType::TextContent:
+	case EChatStreamEventType::TextContent:
 		UE_LOG(LogUnrealClaude, Log, TEXT("[StreamEvent] TextContent: %d chars"), Event.Text.Len());
 		break;
 
-	case EClaudeStreamEventType::ToolUse:
+	case EChatStreamEventType::ToolUse:
 		UE_LOG(LogUnrealClaude, Log, TEXT("[StreamEvent] ToolUse: %s (id=%s)"), *Event.ToolName, *Event.ToolCallId);
 		HandleToolUseEvent(Event);
 		break;
 
-	case EClaudeStreamEventType::ToolResult:
+	case EChatStreamEventType::ToolResult:
 		UE_LOG(LogUnrealClaude, Log, TEXT("[StreamEvent] ToolResult: tool_id=%s, %d chars"),
 			*Event.ToolCallId, Event.ToolResultContent.Len());
 		HandleToolResultEvent(Event);
 		break;
 
-	case EClaudeStreamEventType::Result:
+	case EChatStreamEventType::Result:
 		UE_LOG(LogUnrealClaude, Log, TEXT("[StreamEvent] Result: error=%d, duration=%dms, turns=%d, cost=$%.4f"),
 			Event.bIsError, Event.DurationMs, Event.NumTurns, Event.TotalCostUsd);
 		HandleResultEvent(Event);
@@ -751,7 +750,7 @@ void SClaudeEditorWidget::OnClaudeStreamEvent(const FClaudeStreamEvent& Event)
 	}
 }
 
-void SClaudeEditorWidget::FinalizeStreamingResponse()
+void SChatEditorWidget::FinalizeStreamingResponse()
 {
 	// Save the final text segment
 	AllTextSegments.Add(CurrentSegmentText);
@@ -778,7 +777,7 @@ void SClaudeEditorWidget::FinalizeStreamingResponse()
 	// Post-process text segments to render code blocks
 	ParseAndRenderCodeBlocks();
 
-	// Clear all streaming state (except StreamingResponse which is used by OnClaudeResponse)
+	// Clear all streaming state (except StreamingResponse which is used by OnChatResponse)
 	StreamingTextBlock.Reset();
 	StreamingContentBox.Reset();
 	CurrentSegmentText.Empty();
@@ -797,7 +796,7 @@ void SClaudeEditorWidget::FinalizeStreamingResponse()
 	ToolGroupCallIds.Empty();
 }
 
-void SClaudeEditorWidget::HandleToolUseEvent(const FClaudeStreamEvent& Event)
+void SChatEditorWidget::HandleToolUseEvent(const FChatStreamEvent& Event)
 {
 	if (!StreamingContentBox.IsValid())
 	{
@@ -970,7 +969,7 @@ void SClaudeEditorWidget::HandleToolUseEvent(const FClaudeStreamEvent& Event)
 	}
 }
 
-void SClaudeEditorWidget::HandleToolResultEvent(const FClaudeStreamEvent& Event)
+void SChatEditorWidget::HandleToolResultEvent(const FChatStreamEvent& Event)
 {
 	// Look up tool name
 	const FString* ToolNamePtr = ToolCallNames.Find(Event.ToolCallId);
@@ -1013,7 +1012,7 @@ void SClaudeEditorWidget::HandleToolResultEvent(const FClaudeStreamEvent& Event)
 	}
 }
 
-void SClaudeEditorWidget::HandleResultEvent(const FClaudeStreamEvent& Event)
+void SChatEditorWidget::HandleResultEvent(const FChatStreamEvent& Event)
 {
 	if (!StreamingContentBox.IsValid())
 	{
@@ -1061,7 +1060,7 @@ void SClaudeEditorWidget::HandleResultEvent(const FClaudeStreamEvent& Event)
 	}
 }
 
-FString SClaudeEditorWidget::GetDisplayToolName(const FString& FullToolName)
+FString SChatEditorWidget::GetDisplayToolName(const FString& FullToolName)
 {
 	FString Name = FullToolName;
 	// Strip common MCP server prefix for cleaner display
@@ -1069,7 +1068,7 @@ FString SClaudeEditorWidget::GetDisplayToolName(const FString& FullToolName)
 	return Name;
 }
 
-void SClaudeEditorWidget::UpdateToolGroupSummary()
+void SChatEditorWidget::UpdateToolGroupSummary()
 {
 	if (!ToolGroupSummaryText.IsValid())
 	{
@@ -1121,7 +1120,7 @@ void SClaudeEditorWidget::UpdateToolGroupSummary()
 	}
 }
 
-void SClaudeEditorWidget::ParseCodeFences(const FString& Input, TArray<TPair<FString, bool>>& OutSections)
+void SChatEditorWidget::ParseCodeFences(const FString& Input, TArray<TPair<FString, bool>>& OutSections)
 {
 	OutSections.Empty();
 
@@ -1194,7 +1193,7 @@ void SClaudeEditorWidget::ParseCodeFences(const FString& Input, TArray<TPair<FSt
 	}
 }
 
-void SClaudeEditorWidget::ParseAndRenderCodeBlocks()
+void SChatEditorWidget::ParseAndRenderCodeBlocks()
 {
 	for (int32 i = 0; i < TextSegmentBlocks.Num() && i < TextSegmentContainers.Num(); ++i)
 	{
@@ -1273,13 +1272,13 @@ void SClaudeEditorWidget::ParseAndRenderCodeBlocks()
 	}
 }
 
-void SClaudeEditorWidget::AppendToLastResponse(const FString& Text)
+void SChatEditorWidget::AppendToLastResponse(const FString& Text)
 {
-	// Delegate to OnClaudeProgress for streaming updates
-	OnClaudeProgress(Text);
+	// Delegate to OnChatProgress for streaming updates
+	OnChatProgress(Text);
 }
 
-void SClaudeEditorWidget::RefreshProjectContext()
+void SChatEditorWidget::RefreshProjectContext()
 {
 	AddMessage(TEXT("Refreshing project context..."), false);
 
@@ -1289,7 +1288,7 @@ void SClaudeEditorWidget::RefreshProjectContext()
 	AddMessage(FString::Printf(TEXT("Project context updated: %s"), *Summary), false);
 }
 
-FText SClaudeEditorWidget::GetProjectContextSummary() const
+FText SChatEditorWidget::GetProjectContextSummary() const
 {
 	if (FProjectContextManager::Get().HasContext())
 	{
@@ -1298,7 +1297,7 @@ FText SClaudeEditorWidget::GetProjectContextSummary() const
 	return LOCTEXT("NoContext", "No context gathered");
 }
 
-FString SClaudeEditorWidget::GenerateMCPStatusMessage() const
+FString SChatEditorWidget::GenerateMCPStatusMessage() const
 {
 	FString StatusMessage = TEXT("─────────────────────────────────\n");
 	StatusMessage += TEXT("MCP Tool Status:\n");

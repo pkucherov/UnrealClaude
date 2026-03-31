@@ -1,6 +1,6 @@
 // Copyright Natali Caggiano. All Rights Reserved.
 
-#include "SClaudeToolbar.h"
+#include "SChatToolbar.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Text/STextBlock.h"
@@ -11,7 +11,7 @@
 
 #define LOCTEXT_NAMESPACE "UnrealClaude"
 
-void SClaudeToolbar::Construct(const FArguments& InArgs)
+void SChatToolbar::Construct(const FArguments& InArgs)
 {
 	bUE57ContextEnabled = InArgs._bUE57ContextEnabled;
 	bProjectContextEnabled = InArgs._bProjectContextEnabled;

@@ -2,9 +2,9 @@
 
 #include "UnrealClaudeModule.h"
 #include "UnrealClaudeCommands.h"
-#include "ClaudeEditorWidget.h"
-#include "ClaudeCodeRunner.h"
-#include "ClaudeSubsystem.h"
+#include "ChatEditorWidget.h"
+#include "ChatSubsystem.h"
+#include "ChatBackendFactory.h"
 #include "ScriptExecutionManager.h"
 #include "MCP/UnrealClaudeMCPServer.h"
 #include "ProjectContext.h"
@@ -84,12 +84,12 @@ void FUnrealClaudeModule::StartupModule()
 
 							// Send prompt to Claude
 							FString Prompt = Text.ToString();
-							FClaudePromptOptions Options;
+							FChatPromptOptions Options;
 							Options.bIncludeEngineContext = true;
 							Options.bIncludeProjectContext = true;
-							FClaudeCodeSubsystem::Get().SendPrompt(
+							FChatSubsystem::Get().SendPrompt(
 								Prompt,
-								FOnClaudeResponse::CreateLambda([](const FString& Response, bool bSuccess)
+								FOnChatResponse::CreateLambda([](const FString& Response, bool bSuccess)
 								{
 									// Show response in notification
 									FNotificationInfo Info(FText::FromString(
@@ -118,7 +118,7 @@ void FUnrealClaudeModule::StartupModule()
 		}),
 		FCanExecuteAction::CreateLambda([]()
 		{
-			return FClaudeCodeRunner::IsClaudeAvailable();
+			return FChatSubsystem::Get().IsBackendAvailable();
 		})
 	);
 
@@ -131,7 +131,7 @@ void FUnrealClaudeModule::StartupModule()
 				.TabRole(ETabRole::NomadTab)
 				.Label(LOCTEXT("ClaudeTabTitle", "Claude Assistant"))
 				[
-					SNew(SClaudeEditorWidget)
+					SNew(SChatEditorWidget)
 				];
 		}))
 		.SetDisplayName(LOCTEXT("ClaudeTabTitle", "Claude Assistant"))
@@ -146,10 +146,10 @@ void FUnrealClaudeModule::StartupModule()
 	FLevelEditorModule& LevelEditorModule = FModuleManager::LoadModuleChecked<FLevelEditorModule>("LevelEditor");
 	LevelEditorModule.GetGlobalLevelEditorActions()->Append(PluginCommands.ToSharedRef());
 
-	// Check Claude availability
-	if (FClaudeCodeRunner::IsClaudeAvailable())
+	// Check backend availability
+	if (FChatBackendFactory::IsBinaryAvailable(EChatBackendType::Claude))
 	{
-		UE_LOG(LogUnrealClaude, Log, TEXT("Claude CLI found at: %s"), *FClaudeCodeRunner::GetClaudePath());
+		UE_LOG(LogUnrealClaude, Log, TEXT("Claude CLI found — backend available"));
 	}
 	else
 	{

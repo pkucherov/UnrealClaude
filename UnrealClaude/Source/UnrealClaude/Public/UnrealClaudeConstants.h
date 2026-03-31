@@ -233,4 +233,14 @@ namespace UnrealClaudeConstants
 		/** Spacing between thumbnail previews in the image strip (pixels) */
 		constexpr float ThumbnailSpacing = 4.0f;
 	}
+
+	/** Backend configuration constants */
+	namespace Backend
+	{
+		/** Default port for OpenCode server */
+		constexpr uint32 DefaultOpenCodePort = 4096;
+
+		/** Default backend if no preference set */
+		constexpr const TCHAR* DefaultBackendString = TEXT("Claude");
+	}
 }

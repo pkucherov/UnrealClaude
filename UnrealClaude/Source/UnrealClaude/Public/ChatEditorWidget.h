@@ -3,14 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "IClaudeRunner.h"
+#include "ChatBackendTypes.h"
 #include "Widgets/SCompoundWidget.h"
 #include "Widgets/DeclarativeSyntaxSupport.h"
 
 class SMultiLineEditableTextBox;
 class SScrollBox;
 class SVerticalBox;
-class SClaudeInputArea;
+class SChatInputArea;
 class SExpandableArea;
 
 /**
@@ -30,17 +30,17 @@ public:
 };
 
 /**
- * Main Claude chat widget for the editor
+ * Main chat widget for the editor
  */
-class UNREALCLAUDE_API SClaudeEditorWidget : public SCompoundWidget
+class UNREALCLAUDE_API SChatEditorWidget : public SCompoundWidget
 {
 public:
-	SLATE_BEGIN_ARGS(SClaudeEditorWidget)
+	SLATE_BEGIN_ARGS(SChatEditorWidget)
 	{}
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
-	virtual ~SClaudeEditorWidget();
+	virtual ~SChatEditorWidget();
 
 private:
 	/** UI Construction */
@@ -55,7 +55,7 @@ private:
 	/** Add streaming response (appends to last assistant message) */
 	void AppendToLastResponse(const FString& Text);
 	
-	/** Send the current input to Claude */
+	/** Send the current input to the active backend */
 	void SendMessage();
 	
 	/** Clear chat history */
@@ -73,11 +73,11 @@ private:
 	/** Start a new session (clear history and saved session) */
 	void NewSession();
 	
-	/** Handle response from Claude */
-	void OnClaudeResponse(const FString& Response, bool bSuccess);
+	/** Handle response from backend */
+	void OnChatResponse(const FString& Response, bool bSuccess);
 	
-	/** Check if Claude CLI is available */
-	bool IsClaudeAvailable() const;
+	/** Check if active backend is available */
+	bool IsBackendAvailable() const;
 	
 	/** Get status text */
 	FText GetStatusText() const;
@@ -93,7 +93,7 @@ private:
 	TSharedPtr<SScrollBox> ChatScrollBox;
 
 	/** Input area widget */
-	TSharedPtr<SClaudeInputArea> InputArea;
+	TSharedPtr<SChatInputArea> InputArea;
 
 	/** Current input text */
 	FString CurrentInputText;
@@ -170,11 +170,11 @@ private:
 	/** Include project context in prompts */
 	bool bIncludeProjectContext = true;
 
-	/** Handle streaming progress from Claude (legacy, still used for accumulation) */
-	void OnClaudeProgress(const FString& PartialOutput);
+	/** Handle streaming progress (legacy, still used for accumulation) */
+	void OnChatProgress(const FString& PartialOutput);
 
-	/** Handle structured NDJSON stream events from Claude */
-	void OnClaudeStreamEvent(const FClaudeStreamEvent& Event);
+	/** Handle structured NDJSON stream events */
+	void OnChatStreamEvent(const FChatStreamEvent& Event);
 
 	/** Reset all streaming and tool tracking state to defaults */
 	void ResetStreamingState();
@@ -186,13 +186,13 @@ private:
 	void FinalizeStreamingResponse();
 
 	/** Handle a ToolUse stream event (insert tool indicator, start new text segment) */
-	void HandleToolUseEvent(const FClaudeStreamEvent& Event);
+	void HandleToolUseEvent(const FChatStreamEvent& Event);
 
 	/** Handle a ToolResult stream event (update tool indicator with completion + result) */
-	void HandleToolResultEvent(const FClaudeStreamEvent& Event);
+	void HandleToolResultEvent(const FChatStreamEvent& Event);
 
 	/** Handle a Result stream event (append stats footer) */
-	void HandleResultEvent(const FClaudeStreamEvent& Event);
+	void HandleResultEvent(const FChatStreamEvent& Event);
 
 	/** Update tool group summary text based on pending/completed state */
 	void UpdateToolGroupSummary();

@@ -10,13 +10,13 @@ DECLARE_DELEGATE(FOnToolbarAction)
 DECLARE_DELEGATE_OneParam(FOnCheckboxChanged, bool)
 
 /**
- * Toolbar widget for Claude Editor
+ * Toolbar widget for chat editor
  * Handles UE context toggles, session management buttons
  */
-class SClaudeToolbar : public SCompoundWidget
+class SChatToolbar : public SCompoundWidget
 {
 public:
-	SLATE_BEGIN_ARGS(SClaudeToolbar)
+	SLATE_BEGIN_ARGS(SChatToolbar)
 		: _bUE57ContextEnabled(true)
 		, _bProjectContextEnabled(true)
 		, _bRestoreEnabled(false)
