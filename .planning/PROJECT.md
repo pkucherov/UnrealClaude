@@ -24,6 +24,9 @@ Users can get AI coding assistance inside the Unreal Editor from either Claude C
 - ✓ Keyboard shortcuts and Tools menu integration — existing
 - ✓ IClaudeRunner abstraction for Claude CLI execution — existing
 - ✓ IChatBackend abstraction with 9 pure virtual methods, EChatBackendType enum, polymorphic config, FChatBackendFactory — Validated in Phase 2: Backend Abstraction
+- ✓ FOpenCodeSSEParser: stateful SSE chunk-to-event parser (10 event type mappings, 21 tests) — Validated in Phase 3: SSE Parser & Server Lifecycle
+- ✓ FOpenCodeHttpClient: production HTTP/SSE client (synchronous Get/Post, BeginSSEStream, CheckHealth, 9 tests) — Validated in Phase 3
+- ✓ FOpenCodeServerLifecycle: six-state server lifecycle manager (PID file, port retry, backoff, 19 tests) — Validated in Phase 3
 
 ### Active
 
@@ -89,4 +92,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-01 after Phase 2 completion*
+*Last updated: 2026-04-01 after Phase 3 completion*

@@ -61,7 +61,7 @@ Plans:
   3. Plugin auto-detects a running `opencode serve` instance via health endpoint, and spawns one if none found
   4. Managed `opencode serve` process is gracefully terminated on editor shutdown, with PID file tracking preventing orphan processes on crash recovery
   5. SSE connection auto-reconnects with exponential backoff (1s → 2s → 4s → max 30s) on disconnect
-**Plans:** 4/4 plans executed
+**Plans:** 4/4 plans complete
 
 Plans:
 - [x] 03-01-PLAN.md — Foundation types, interfaces, constants, and mock implementations
@@ -104,6 +104,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Test Baseline | 5/5 | Complete | 2026-03-31 |
 | 2. Backend Abstraction | 1/1 | Complete | 2026-03-31 |
-| 3. SSE Parser & Server Lifecycle | 4/4 | Complete | 2026-04-01 |
+| 3. SSE Parser & Server Lifecycle | 4/4 | Complete    | 2026-04-01 |
 | 4. OpenCode Runner & Sessions | 0/TBD | Not started | - |
 | 5. Chat UI & Backend Switching | 0/TBD | Not started | - |
