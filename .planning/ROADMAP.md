@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Test Baseline** - Establish existing test coverage baseline before any code changes
 - [x] **Phase 2: Backend Abstraction** - Generalize IClaudeRunner into backend-agnostic IChatBackend interface
-- [ ] **Phase 3: SSE Parser & Server Lifecycle** - Build and test the independent OpenCode components (SSE stream parsing, server auto-detect/spawn/shutdown)
+- [x] **Phase 3: SSE Parser & Server Lifecycle** - Build and test the independent OpenCode components (SSE stream parsing, server auto-detect/spawn/shutdown)
 - [ ] **Phase 4: OpenCode Runner & Sessions** - Compose components into FOpenCodeRunner with session management, MCP registration, and full API integration
 - [ ] **Phase 5: Chat UI & Backend Switching** - Add toolbar backend switcher, status indicators, unified history, and backend switching tests
 
@@ -61,13 +61,13 @@ Plans:
   3. Plugin auto-detects a running `opencode serve` instance via health endpoint, and spawns one if none found
   4. Managed `opencode serve` process is gracefully terminated on editor shutdown, with PID file tracking preventing orphan processes on crash recovery
   5. SSE connection auto-reconnects with exponential backoff (1s → 2s → 4s → max 30s) on disconnect
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans executed
 
 Plans:
 - [x] 03-01-PLAN.md — Foundation types, interfaces, constants, and mock implementations
 - [x] 03-02-PLAN.md — FOpenCodeSSEParser (TDD) — stateful SSE chunk-to-event parser
 - [x] 03-03-PLAN.md — FOpenCodeHttpClient — production HTTP/SSE client + interface tests
-- [ ] 03-04-PLAN.md — FOpenCodeServerLifecycle (TDD) — six-state server lifecycle manager
+- [x] 03-04-PLAN.md — FOpenCodeServerLifecycle (TDD) — six-state server lifecycle manager
 
 ### Phase 4: OpenCode Runner & Sessions
 **Goal**: A fully functional OpenCode backend can send and receive streaming messages, manage sessions, register MCP tools, and handle permissions — ready for UI wiring
@@ -104,6 +104,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Test Baseline | 5/5 | Complete | 2026-03-31 |
 | 2. Backend Abstraction | 1/1 | Complete | 2026-03-31 |
-| 3. SSE Parser & Server Lifecycle | 3/4 | In Progress|  |
+| 3. SSE Parser & Server Lifecycle | 4/4 | Complete | 2026-04-01 |
 | 4. OpenCode Runner & Sessions | 0/TBD | Not started | - |
 | 5. Chat UI & Backend Switching | 0/TBD | Not started | - |
