@@ -79,7 +79,11 @@ Plans:
   3. Existing MCP bridge URL is dynamically registered with OpenCode via `POST /mcp`, making all 30+ editor tools available to the OpenCode backend
   4. OpenCode permission prompts (file writes, command execution) are surfaced to the user through the existing permission dialog flow
   5. All new classes (FOpenCodeRunner, FOpenCodeSSEParser, FOpenCodeServerLifecycle) have ≥90% unit test coverage
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — FOpenCodeRunner core implementation + ChatBackendFactory wiring
+- [ ] 04-02-PLAN.md — Comprehensive FOpenCodeRunner test suite (≥20 tests)
 
 ### Phase 5: Chat UI & Backend Switching
 **Goal**: Users can switch between Claude and OpenCode from the chat toolbar, see connection status, and have a unified conversation history across both backends
@@ -105,5 +109,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Test Baseline | 5/5 | Complete | 2026-03-31 |
 | 2. Backend Abstraction | 1/1 | Complete | 2026-03-31 |
 | 3. SSE Parser & Server Lifecycle | 4/4 | Complete    | 2026-04-01 |
-| 4. OpenCode Runner & Sessions | 0/TBD | Not started | - |
+| 4. OpenCode Runner & Sessions | 0/2 | Planning complete | - |
 | 5. Chat UI & Backend Switching | 0/TBD | Not started | - |
