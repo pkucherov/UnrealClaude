@@ -170,4 +170,146 @@ public:
 	}
 };
 
+// ===== OpenCode Test Mocks =====
+
+#include "OpenCode/IProcessLauncher.h"
+#include "OpenCode/OpenCodeHttpClient.h"
+#include "OpenCode/OpenCodeTypes.h"
+
+/**
+ * Mock process launcher for testing FOpenCodeServerLifecycle without real process spawning (D-27).
+ * All behavior controlled via public bool flags and call counters.
+ */
+class FMockProcessLauncher : public IProcessLauncher
+{
+public:
+	/** Whether LaunchProcess should simulate a successful spawn */
+	bool bLaunchShouldSucceed = true;
+	/** Whether IsProcRunning returns true */
+	bool bProcessIsRunning = true;
+	/** Whether IsApplicationRunning returns true */
+	bool bApplicationIsRunning = true;
+	/** Simulated PID written to OutProcessID */
+	uint32 MockPID = 12345;
+	/** Number of times LaunchProcess was called */
+	int32 LaunchCallCount = 0;
+	/** Number of times TerminateProc was called */
+	int32 TerminateCallCount = 0;
+	/** Last Params string passed to LaunchProcess */
+	FString LastLaunchParams;
+
+	virtual FProcHandle LaunchProcess(
+		const TCHAR* URL, const TCHAR* Params,
+		bool bLaunchDetached, bool bLaunchHidden, bool bLaunchReallyHidden,
+		uint32* OutProcessID, int32 PriorityModifier,
+		const TCHAR* WorkingDirectory, void* PipeWriteChild) override
+	{
+		++LaunchCallCount;
+		LastLaunchParams = Params;
+		if (OutProcessID)
+		{
+			*OutProcessID = bLaunchShouldSucceed ? MockPID : 0;
+		}
+		// UE FProcHandle default-constructs as invalid.
+		// Lifecycle checks bLaunchShouldSucceed / OutProcessID != 0 rather than handle validity.
+		return FProcHandle();
+	}
+
+	virtual bool IsProcRunning(FProcHandle& Handle) override
+	{
+		return bProcessIsRunning;
+	}
+
+	virtual void TerminateProc(FProcHandle& Handle, bool bKillTree = false) override
+	{
+		++TerminateCallCount;
+	}
+
+	virtual bool IsApplicationRunning(uint32 ProcessId) override
+	{
+		return bApplicationIsRunning;
+	}
+};
+
+/**
+ * Mock HTTP client for testing without real network calls (D-27).
+ * Provides SimulateSSEData / SimulateSSEDisconnect helpers for SSE tests.
+ */
+class FMockHttpClient : public IHttpClient
+{
+public:
+	/** HTTP status code to return from Get/Post */
+	int32 MockStatusCode = 200;
+	/** Response body to return from Get/Post */
+	FString MockResponseBody = TEXT("{\"healthy\":true,\"version\":\"0.1.0\"}");
+	/** Number of times Get was called */
+	int32 GetCallCount = 0;
+	/** Number of times Post was called */
+	int32 PostCallCount = 0;
+	/** Last URL passed to Get or BeginSSEStream */
+	FString LastGetUrl;
+	/** Last URL passed to Post */
+	FString LastPostUrl;
+	/** Last body passed to Post */
+	FString LastPostBody;
+	/** Last stream callback passed to BeginSSEStream */
+	TFunction<bool(void*, int64)> LastStreamCallback;
+	/** Last disconnect callback passed to BeginSSEStream */
+	TFunction<void()> LastDisconnectCallback;
+	/** Whether SSE stream is currently active */
+	bool bSSEStreamActive = false;
+
+	virtual int32 Get(const FString& Url, FString& OutBody) override
+	{
+		++GetCallCount;
+		LastGetUrl = Url;
+		OutBody = MockResponseBody;
+		return MockStatusCode;
+	}
+
+	virtual int32 Post(const FString& Url, const FString& Body, FString& OutResponse) override
+	{
+		++PostCallCount;
+		LastPostUrl = Url;
+		LastPostBody = Body;
+		OutResponse = MockResponseBody;
+		return MockStatusCode;
+	}
+
+	virtual void BeginSSEStream(const FString& Url,
+		TFunction<bool(void* Ptr, int64 Length)> StreamCallback,
+		TFunction<void()> OnDisconnected) override
+	{
+		LastGetUrl = Url;
+		LastStreamCallback = StreamCallback;
+		LastDisconnectCallback = OnDisconnected;
+		bSSEStreamActive = true;
+	}
+
+	virtual void AbortSSEStream() override
+	{
+		bSSEStreamActive = false;
+	}
+
+	/** Test helper: simulate receiving a chunk of SSE data through the stream callback */
+	void SimulateSSEData(const FString& Data)
+	{
+		if (LastStreamCallback)
+		{
+			auto Utf8 = FTCHARToUTF8(*Data);
+			LastStreamCallback((void*)Utf8.Get(), Utf8.Length());
+		}
+	}
+
+	/** Test helper: simulate SSE stream disconnect firing the disconnect callback */
+	void SimulateSSEDisconnect()
+	{
+		bSSEStreamActive = false;
+		if (LastDisconnectCallback)
+		{
+			LastDisconnectCallback();
+		}
+	}
+};
+
 #endif // WITH_DEV_AUTOMATION_TESTS
