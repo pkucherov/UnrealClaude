@@ -75,7 +75,38 @@ enum class EChatStreamEventType : uint8
 	Result,
 	/** Raw assistant message (full message, not parsed into sub-events) */
 	AssistantMessage,
+	/** Permission request from backend (OpenCode permission.updated) */
+	PermissionRequest,
+	/** Backend status update (OpenCode session.status: idle/busy/retry) */
+	StatusUpdate,
+	/** Agent thinking / reasoning step (OpenCode step-start/step-finish/reasoning parts) */
+	AgentThinking,
 	/** Unknown or unparsed event type */
+	Unknown
+};
+
+// ===== EOpenCodeErrorType =====
+
+/**
+ * Error classification for OpenCode backend errors (D-28).
+ * Allows the UI to display actionable messages per error category.
+ * Claude backend events always use None.
+ */
+enum class EOpenCodeErrorType : uint8
+{
+	/** Not an error */
+	None,
+	/** Connection refused / timeout / DNS failure */
+	ServerUnreachable,
+	/** 401/403 from OpenCode */
+	AuthFailure,
+	/** 429 from OpenCode */
+	RateLimit,
+	/** 400 — malformed request */
+	BadRequest,
+	/** 500 from OpenCode */
+	InternalError,
+	/** Unclassified error */
 	Unknown
 };
 
@@ -111,6 +142,9 @@ struct UNREALCLAUDE_API FChatStreamEvent
 
 	/** Whether this is an error event */
 	bool bIsError = false;
+
+	/** OpenCode error classification (None for non-error or Claude events) */
+	EOpenCodeErrorType ErrorType = EOpenCodeErrorType::None;
 
 	/** Duration in ms (for Result events) */
 	int32 DurationMs = 0;

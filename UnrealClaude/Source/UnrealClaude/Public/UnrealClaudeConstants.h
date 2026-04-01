@@ -242,5 +242,29 @@ namespace UnrealClaudeConstants
 
 		/** Default backend if no preference set */
 		constexpr const TCHAR* DefaultBackendString = TEXT("Claude");
+
+		/** Health poll interval for connected OpenCode server (D-11) */
+		constexpr float HealthPollIntervalSeconds = 10.0f;
+
+		/** Graceful shutdown timeout before force-kill (D-14) */
+		constexpr float GracefulShutdownTimeoutSeconds = 10.0f;
+
+		/** Initial SSE reconnect backoff delay (D-16) */
+		constexpr float SSEReconnectBackoffInitialSeconds = 1.0f;
+
+		/** Maximum SSE reconnect backoff delay cap (D-16) */
+		constexpr float SSEReconnectBackoffMaxSeconds = 30.0f;
+
+		/** Number of ports to try: 4096, 4097, 4098, 4099 (D-07) */
+		constexpr int32 MaxPortRetryCount = 4;
+
+		/** PID file name for managed OpenCode server (D-06) */
+		inline constexpr const TCHAR* OpenCodePidFilename = TEXT("opencode-server.pid");
+
+		/** Environment variable for custom OpenCode port (D-13) */
+		inline constexpr const TCHAR* OpenCodePortEnvVar = TEXT("OPENCODE_PORT");
+
+		/** OpenCode binary name for PATH search */
+		inline constexpr const TCHAR* OpenCodeBinaryName = TEXT("opencode");
 	}
 }
